@@ -1,0 +1,141 @@
+# SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+# SPDX-License-Identifier: Apache-2.0
+
+import json
+import logging
+from pathlib import Path
+
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
+console = Console()
+
+try:
+    from metis.vector_store.pgvector_store import PGVectorStoreImpl
+
+    PG_SUPPORTED = True
+except ImportError:
+    PG_SUPPORTED = False
+
+
+def configure_logger(logger, args):
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
+    logger.setLevel(logging.DEBUG)  # Capture everything; handlers will filter
+
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.ERROR)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    if getattr(args, "log_file", None):
+        file_handler = logging.FileHandler(args.log_file)
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+    if getattr(args, "log_level", None):
+        level = getattr(logging, args.log_level.upper(), None)
+        if level:
+            logger.setLevel(level)
+
+
+def print_console(message, quiet=False, **kwargs):
+    if not quiet:
+        console.print(message, **kwargs)
+
+
+def with_spinner(task_description, fn, *args, **kwargs):
+    with Progress(
+        SpinnerColumn(), TextColumn("[bold cyan]{task.description}"), console=console
+    ) as progress:
+        task = progress.add_task(task_description, total=None)
+        result = fn(*args, **kwargs)
+        progress.update(task, completed=1)
+        progress.stop()
+    return result
+
+
+def save_output(output_file, data, quiet=False):
+    if output_file:
+        with open(output_file, "w") as f:
+            json.dump(data, f, indent=4)
+        print_console(f"[blue]Results saved to {output_file}[/blue]", quiet)
+
+
+def check_file_exists(file_path, quiet=False):
+    if not Path(file_path).is_file():
+        print_console(f"[red]File not found:[/red] {file_path}", quiet)
+        return False
+    return True
+
+
+def pretty_print_reviews(results, quiet=False):
+    if not results or not results.get("reviews"):
+        print_console("[bold green]No security issues found![/bold green]", quiet)
+        return
+
+    for file_review in results.get("reviews", []):
+        file = file_review.get("file", "UNKNOWN FILE")
+        reviews = file_review.get("reviews", [])
+        if reviews:
+            print_console(f"\n[bold blue]File: {file}[/bold blue]", quiet)
+            for idx, r in enumerate(reviews, 1):
+                print_console(
+                    f" [yellow]Identified issue {idx}:[/yellow] [bold]{r.get('issue','-')}[/bold]",
+                    quiet,
+                )
+                if r.get("code_snippet"):
+                    print_console(
+                        f"    [cyan]Snippet:[/cyan] [dim]{(r['code_snippet'][:100] + '...') if len(r['code_snippet']) > 100 else r['code_snippet']}",
+                        quiet,
+                    )
+                if r.get("reasoning"):
+                    print_console(f"    [white]Why:[/white] {r['reasoning']}", quiet)
+                if r.get("mitigation"):
+                    print_console(
+                        f"    [green]Mitigation:[/green] {r['mitigation']}", quiet
+                    )
+                if r.get("confidence") is not None:
+                    print_console(
+                        f"    [magenta]Confidence:[/magenta] {r['confidence']}\n", quiet
+                    )
+        else:
+            print_console(f"[green]No issues in {file}[/green]", quiet)
+
+
+def build_pg_backend(args, runtime, embed_model_code, embed_model_docs, quiet=False):
+    if not PG_SUPPORTED:
+        print_console(
+            "[bold red]Postgres backend requested but not installed. Please install with:[/bold red]",
+            quiet,
+        )
+        print_console("  uv pip install '.[postgres]'", quiet, markup=False)
+        exit(1)
+
+    connection_string = (
+        f"postgresql://{runtime['pg_username']}:{runtime['pg_password']}"
+        f"@{runtime['pg_host']}:{int(runtime['pg_port'])}/{runtime['pg_db_name']}"
+    )
+    return PGVectorStoreImpl(
+        connection_string=connection_string,
+        project_schema=args.project_schema,
+        embed_model_code=embed_model_code,
+        embed_model_docs=embed_model_docs,
+        embed_dim=runtime["embed_dim"],
+        hnsw_kwargs=runtime.get("hnsw_kwargs", {}),
+    )
+
+
+def build_chroma_backend(args, runtime, embed_model_code, embed_model_docs):
+    from metis.vector_store.chroma_store import ChromaStore
+
+    return ChromaStore(
+        persist_dir=args.chroma_dir,
+        embed_model_code=embed_model_code,
+        embed_model_docs=embed_model_docs,
+        query_config=runtime.get("query", {}),
+    )

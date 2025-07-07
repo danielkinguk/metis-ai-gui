@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install test dependencies
+        run: uv pip install '.[test]'
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Run pre-commit checks
+        run: |
+          uv pip install pre-commit
+          uv run pre-commit run --all-files --show-diff-on-failure
+
+      - name: Run Bandit
+        run: |
+          uv pip install bandit
+          uv run bandit -r . -x "./.venv/*","./tests" --severity-level medium

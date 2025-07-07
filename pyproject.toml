@@ -1,0 +1,42 @@
+[project]
+name = "metis"
+version = "0.1.0"
+description = "Metis is a command line tool for performing security code reviews using LLMs"
+readme = "README.md"
+license = { file = "LICENSE.md" }
+keywords = ["security", "llm", "code-review"]
+requires-python = ">=3.12.0"
+dependencies = [
+    "llama-index>=0.12.45",
+    "llama-index-vector-stores-chroma>=0.4.2",
+    "rich>=14.0.0",
+    "PyYAML>=6.0.2",
+    "prompt_toolkit>=3.0.51",
+    "unidiff>=0.7.5",
+    "tree-sitter>=0.24.0",
+    "tree-sitter-language-pack>=0.8.0",
+    "chromadb>=1.0.13"
+]
+
+[build-system]
+requires = ["setuptools>=80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+metis = "metis.cli.entry:main"
+
+[project.optional-dependencies]
+postgres = ["llama-index-vector-stores-postgres>=0.5.4"]
+test = ["pytest>=8.4.0"]
+
+lint = [
+  "ruff>=0.12.1",
+  "black>=25.1.0",
+  "mypy>=1.16.1",
+  "pre-commit>=4.2.0"
+]
+
+dev = [
+  "metis[test]",
+  "metis[lint]"
+]

@@ -1,0 +1,31 @@
+psql_database:
+  provider: "config"
+  credentials:
+    username: "metis_user"
+    password: "metis_password"
+    host: "localhost"
+    port: 5432
+    database_name: "metis_db"
+
+metis_engine:
+  max_token_length: 100000
+  max_workers: 5
+  embed_dim: 1536
+  hnsw_kwargs:
+    hnsw_m: 16
+    hnsw_ef_construction: 64
+    hnsw_ef_search: 40
+    hnsw_dist_method: "vector_cosine_ops"
+
+llm_provider:
+  name: "openai"
+  model: "o3-mini"
+  code_embedding_model: "text-embedding-3-large"
+  docs_embedding_model: "text-embedding-3-large"
+
+query:
+  model: "o3-mini"
+  similarity_top_k: 5
+  response_mode: "tree_summarize"
+  max_tokens: 5000
+  temperature: 0.0

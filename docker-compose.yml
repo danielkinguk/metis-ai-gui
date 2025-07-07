@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    container_name: metis_postgres
+    environment:
+      POSTGRES_USER: metis_user
+      POSTGRES_PASSWORD: metis_password
+      POSTGRES_DB: metis_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/db-init:/docker-entrypoint-initdb.d
+
+volumes:
+  pg_data:
