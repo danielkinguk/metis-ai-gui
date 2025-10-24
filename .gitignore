@@ -10,3 +10,11 @@ dist/
 .python-version
 uv.lock
 chromadb/
+chromadb/
+*.sqlite3
+*.bin
+__pycache__/
+chromadb/
+*.sqlite3
+*.bin
+__pycache__/
