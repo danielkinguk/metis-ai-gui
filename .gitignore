@@ -22,3 +22,5 @@ chromadb/
 *.sqlite3
 *.bin
 __pycache__/
+.env
+.env.*
