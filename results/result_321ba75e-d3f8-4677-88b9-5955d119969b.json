@@ -1,0 +1,41 @@
+{
+    "reviews": [
+        {
+            "file": "metis-ai/run_gui.sh",
+            "file_path": "run_gui.sh",
+            "reviews": [
+                {
+                    "issue": "Installing Python dependencies at startup without integrity verification or an isolated environment (supply-chain risk)",
+                    "code_snippet": "echo \"\ud83d\udce6 Installing GUI dependencies...\"\npython3 -m pip install --user -r gui/requirements.txt",
+                    "reasoning": "The script runs pip install at startup using the project's requirements file into the user's site-packages (the --user flag) every time the launcher runs. Installing packages at runtime from requirements.txt without pinned hashes or other integrity checks can enable supply-chain attacks (malicious or typosquatted packages on PyPI). Additionally, the script does not activate a controlled virtualenv/venv; installing into the global/user environment increases the chance that other system-wide packages or permissions affect behavior and makes it easier for an attacker with local write ability to influence runtime dependencies. This is supported by the file lines that perform the pip install, and by RELEVANT_CONTEXT which stresses using a virtualenv and controlling dependencies.",
+                    "mitigation": "Do not install dependencies at runtime. Use a controlled virtual environment (venv/virtualenv) activated by the launcher, or document and require installation ahead-of-time. Pin package versions and use pip's --require-hashes (or equivalent) so packages are verified on install. Consider vendoring or building reproducible artifacts (e.g., wheels) and verifying package signatures where possible. Avoid installing into the global/user site-packages from a startup script.",
+                    "confidence": 0.8,
+                    "cwe": "CWE-494",
+                    "severity": "High",
+                    "line_number": 19
+                },
+                {
+                    "issue": "Sourcing a .env file directly (source .env) can execute arbitrary shell code and expose secrets if the file is untrusted or has insecure permissions",
+                    "code_snippet": "if [ -f \".env\" ]; then\n    echo \"\ud83d\udcc4 Loading .env file...\"\n    set -a\n    source .env\n    set +a\nfi",
+                    "reasoning": "The launcher uses shell 'source .env' to load environment variables. Sourcing a file executes its contents in the current shell, so if the .env file contains unexpected shell constructs (command substitutions, backticks, function definitions, or malicious shell commands) those would be executed with the privileges of the user running the script. The RELEVANT_CONTEXT describes that .env typically contains API keys and secrets; combined with the fact the script exports everything (set -a), sourcing an untrusted or writable .env can both leak secrets into the environment and execute arbitrary code. The file lines above directly show this behavior.",
+                    "mitigation": "Avoid sourcing unvalidated files. Parse .env in a safe manner (read lines and parse KEY=VALUE pairs without evaluating shell syntax) or use a library that safely loads environment files (e.g., python-dotenv inside a controlled Python process) rather than 'source'. Ensure .env files have strict filesystem permissions (owner-only read/write) and are not writable by untrusted users. Validate the .env contents before loading, and avoid executing the launcher as a privileged user.",
+                    "confidence": 0.9,
+                    "cwe": "CWE-94",
+                    "severity": "High",
+                    "line_number": 22
+                },
+                {
+                    "issue": "Launcher prints that the server will run on localhost:5000 but does not enforce host binding or disable Flask debug/development server \u2014 risk of unexpected remote exposure or running the unsafe dev server",
+                    "code_snippet": "echo \"\ud83c\udf10 Starting web server on http://localhost:5000\"\n...\ncd gui && python3 app.py",
+                    "reasoning": "The script prints a startup message claiming the web server will be on http://localhost:5000, but it simply runs 'python3 app.py' and does not set or enforce FLASK_ENV/FLASK_DEBUG or pass an explicit host/port to the Flask runtime. Whether the server binds to localhost only or to all interfaces, and whether debug mode (which can expose an interactive debugger) is enabled, depends entirely on the implementation of gui/app.py or environment variables. RELEVANT_CONTEXT explicitly highlights that binding to 0.0.0.0 or running with debug enabled increases exposure. Because the launcher does not explicitly ensure safe binding or disable debug mode, there's a risk that the service could be reachable remotely or run in an unsafe development mode despite the printed message suggesting localhost-only operation.",
+                    "mitigation": "Explicitly run the application with a known production configuration: set FLASK_ENV=production and FLASK_DEBUG=0 before starting, or run via a production WSGI server (e.g., gunicorn/uvicorn) bound to the intended interface and port. If the intent is to run only on localhost, explicitly pass the host/port (127.0.0.1:5000) or set environment variables that the application reads. Add a startup validation step that fails if the application would run in debug mode or bind to 0.0.0.0 in production. Document that the launcher is for local use only and require explicit opt-in to expose externally.",
+                    "confidence": 0.7,
+                    "cwe": "CWE-200",
+                    "severity": "High",
+                    "explanation": "The script's user-visible message claims the server will be on localhost:5000 but the script makes no enforcement; whether the server is actually bound to localhost or is in debug mode is determined by gui/app.py or environment variables. This is a contradiction between the script's assertion and the lack of enforcement in the code.",
+                    "line_number": 1
+                }
+            ]
+        }
+    ]
+}

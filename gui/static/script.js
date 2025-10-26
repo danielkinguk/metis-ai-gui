@@ -2,10 +2,14 @@ let currentResultFile = null;
 
 // Check API status on load
 window.addEventListener('DOMContentLoaded', () => {
+    loadTheme();
     checkStatus();
     setupFileInputs();
     setupBackendToggle();
     loadStoredConfig();
+    setupKeyboardShortcuts();
+    setupAccessibility();
+    setupRealTimeValidation();
 });
 
 function checkStatus() {
@@ -89,18 +93,51 @@ function getConfig() {
     };
 }
 
-function showLoading() {
-    document.getElementById('loading-overlay').style.display = 'flex';
+function showLoading(message = 'Processing request...') {
+    const overlay = document.getElementById('loading-overlay');
+    const messageEl = overlay.querySelector('p');
+    messageEl.textContent = message;
+    overlay.style.display = 'flex';
 }
 
 function hideLoading() {
     document.getElementById('loading-overlay').style.display = 'none';
 }
 
+function showProgress(message, progress = null) {
+    const overlay = document.getElementById('loading-overlay');
+    const messageEl = overlay.querySelector('p');
+    const spinner = overlay.querySelector('.spinner');
+    
+    messageEl.textContent = message;
+    overlay.style.display = 'flex';
+    
+    if (progress !== null) {
+        // Add progress bar if not exists
+        let progressBar = overlay.querySelector('.progress-bar');
+        if (!progressBar) {
+            progressBar = document.createElement('div');
+            progressBar.className = 'progress-bar';
+            progressBar.innerHTML = '<div class="progress-fill"></div>';
+            overlay.appendChild(progressBar);
+        }
+        
+        const progressFill = progressBar.querySelector('.progress-fill');
+        progressFill.style.width = `${progress}%`;
+        
+        if (progress >= 100) {
+            setTimeout(() => {
+                progressBar.remove();
+            }, 1000);
+        }
+    }
+}
+
 function showResults(data) {
     const resultsPanel = document.getElementById('results');
     const resultContent = document.getElementById('result-content');
     const downloadBtn = document.getElementById('download-btn');
+    const controlsEl = document.getElementById('results-controls');
     
     resultsPanel.style.display = 'block';
     
@@ -109,15 +146,39 @@ function showResults(data) {
             resultContent.innerHTML = formatResults(data.results);
             currentResultFile = data.output_file;
             downloadBtn.style.display = 'inline-block';
+            
+            // Show controls if there are issues
+            const issues = document.querySelectorAll('.issue');
+            if (issues.length > 0) {
+                controlsEl.style.display = 'block';
+                filterResults(); // Initialize stats
+            }
         } else if (data.stdout) {
-            resultContent.textContent = data.stdout;
+            const messageType = data.warning ? 'warning' : 'success';
+            resultContent.innerHTML = `<div class="message ${messageType}">
+                <div class="message-header">
+                    <strong>${data.title || (data.warning ? 'Warning' : 'Success')}</strong>
+                </div>
+                <div class="message-content">${data.stdout}</div>
+            </div>`;
+            controlsEl.style.display = 'none';
         } else {
-            resultContent.textContent = 'Operation completed successfully.';
+            resultContent.innerHTML = `<div class="message success">
+                <div class="message-header">
+                    <strong>Success</strong>
+                </div>
+                <div class="message-content">Operation completed successfully.</div>
+            </div>`;
+            controlsEl.style.display = 'none';
         }
     } else {
-        resultContent.innerHTML = `<div class="issue">
-            <strong>Error:</strong> ${data.error || data.stderr || 'Unknown error occurred'}
+        resultContent.innerHTML = `<div class="message error">
+            <div class="message-header">
+                <strong>${data.title || 'Error'}</strong>
+            </div>
+            <div class="message-content">${data.error || data.stderr || 'Unknown error occurred'}</div>
         </div>`;
+        controlsEl.style.display = 'none';
     }
     
     resultsPanel.scrollIntoView({ behavior: 'smooth' });
@@ -135,26 +196,80 @@ function formatResults(results) {
 function formatIssue(issue) {
     const severity = issue.severity || 'medium';
     const severityClass = `severity-${severity.toLowerCase()}`;
+    const severityIcon = getSeverityIcon(severity);
     
     return `
-        <div class="issue">
+        <div class="issue" data-severity="${severity.toLowerCase()}">
             <div class="issue-header">
-                <strong>${issue.title || issue.message || 'Security Issue'}</strong>
-                <span class="issue-severity ${severityClass}">${severity.toUpperCase()}</span>
+                <div class="issue-title">
+                    <span class="severity-icon">${severityIcon}</span>
+                    <strong>${issue.title || issue.message || 'Security Issue'}</strong>
+                </div>
+                <div class="issue-meta">
+                    <span class="issue-severity ${severityClass}">${severity.toUpperCase()}</span>
+                    <button class="btn btn-small btn-toggle" onclick="toggleIssueDetails(this)">Details</button>
+                </div>
             </div>
-            <p><strong>File:</strong> ${issue.file || 'N/A'}</p>
-            <p><strong>Line:</strong> ${issue.line || 'N/A'}</p>
-            <p>${issue.description || issue.message || ''}</p>
-            ${issue.recommendation ? `<p><strong>Recommendation:</strong> ${issue.recommendation}</p>` : ''}
+            <div class="issue-details" style="display: none;">
+                <div class="issue-location">
+                    <span class="location-item">
+                        <strong>📁 File:</strong> 
+                        <code>${issue.file || 'N/A'}</code>
+                    </span>
+                    ${issue.line ? `<span class="location-item">
+                        <strong>📍 Line:</strong> 
+                        <code>${issue.line}</code>
+                    </span>` : ''}
+                </div>
+                <div class="issue-description">
+                    <strong>Description:</strong>
+                    <p>${issue.description || issue.message || ''}</p>
+                </div>
+                ${issue.recommendation ? `
+                <div class="issue-recommendation">
+                    <strong>💡 Recommendation:</strong>
+                    <p>${issue.recommendation}</p>
+                </div>
+                ` : ''}
+                ${issue.code_snippet ? `
+                <div class="issue-code">
+                    <strong>Code:</strong>
+                    <pre><code>${issue.code_snippet}</code></pre>
+                </div>
+                ` : ''}
+            </div>
         </div>
     `;
+}
+
+function getSeverityIcon(severity) {
+    switch (severity.toLowerCase()) {
+        case 'high': return '🔴';
+        case 'medium': return '🟡';
+        case 'low': return '🟢';
+        default: return '⚪';
+    }
+}
+
+function toggleIssueDetails(button) {
+    const issue = button.closest('.issue');
+    const details = issue.querySelector('.issue-details');
+    const isVisible = details.style.display !== 'none';
+    
+    details.style.display = isVisible ? 'none' : 'block';
+    button.textContent = isVisible ? 'Details' : 'Hide';
 }
 
 function clearResults() {
     document.getElementById('results').style.display = 'none';
     document.getElementById('result-content').innerHTML = '';
+    document.getElementById('results-controls').style.display = 'none';
+    document.getElementById('results-stats').style.display = 'none';
     currentResultFile = null;
     document.getElementById('download-btn').style.display = 'none';
+    // Clear search and filter
+    document.getElementById('result-search').value = '';
+    document.getElementById('severity-filter').value = '';
 }
 
 function downloadResults() {
@@ -163,14 +278,47 @@ function downloadResults() {
     }
 }
 
-function showError(message) {
-    showResults({ success: false, error: message });
+function showError(message, title = 'Error') {
+    showResults({ 
+        success: false, 
+        error: message,
+        title: title
+    });
+}
+
+function showSuccess(message, title = 'Success') {
+    showResults({ 
+        success: true, 
+        stdout: message,
+        title: title
+    });
+}
+
+function showWarning(message, title = 'Warning') {
+    showResults({ 
+        success: true, 
+        stdout: message,
+        title: title,
+        warning: true
+    });
 }
 
 // API Functions
 async function indexCodebase() {
-    showLoading();
+    // Validate configuration before proceeding
+    const validation = validateConfiguration();
+    if (!showValidationErrors(validation.errors, validation.warnings)) {
+        return;
+    }
+    
+    showProgress('Starting codebase indexing...', 0);
     document.getElementById('index-progress').style.display = 'block';
+    
+    // Simulate progress updates
+    const progressInterval = setInterval(() => {
+        const currentProgress = Math.min(90, Math.random() * 20 + 10);
+        showProgress('Indexing codebase... This may take several minutes.', currentProgress);
+    }, 2000);
     
     try {
         const response = await fetch('/api/index', {
@@ -179,11 +327,24 @@ async function indexCodebase() {
             body: JSON.stringify(getConfig())
         });
         
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
-        showResults(data);
+        
+        // Show completion progress
+        showProgress('Indexing completed! Processing results...', 100);
+        
+        setTimeout(() => {
+            showResults(data);
+        }, 1000);
+        
     } catch (error) {
-        showError(`Failed to index codebase: ${error.message}`);
+        showError(`Failed to index codebase: ${error.message}`, 'Indexing Failed');
     } finally {
+        clearInterval(progressInterval);
         hideLoading();
         document.getElementById('index-progress').style.display = 'none';
     }
@@ -193,7 +354,7 @@ async function askQuestion() {
     const question = document.getElementById('question').value.trim();
     
     if (!question) {
-        showError('Please enter a question');
+        showError('Please enter a question', 'Input Required');
         return;
     }
     
@@ -209,10 +370,15 @@ async function askQuestion() {
             body: JSON.stringify(config)
         });
         
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
         showResults(data);
     } catch (error) {
-        showError(`Failed to process question: ${error.message}`);
+        showError(`Failed to process question: ${error.message}`, 'Question Processing Failed');
     } finally {
         hideLoading();
     }
@@ -285,7 +451,13 @@ async function reviewCode() {
         return;
     }
     
-    showLoading();
+    showProgress('Starting comprehensive security review...', 0);
+    
+    // Simulate progress for long-running operation
+    const progressInterval = setInterval(() => {
+        const currentProgress = Math.min(85, Math.random() * 15 + 5);
+        showProgress('Analyzing codebase for security issues...', currentProgress);
+    }, 3000);
     
     try {
         const response = await fetch('/api/review-code', {
@@ -294,11 +466,23 @@ async function reviewCode() {
             body: JSON.stringify(getConfig())
         });
         
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
-        showResults(data);
+        
+        showProgress('Review completed! Generating report...', 100);
+        
+        setTimeout(() => {
+            showResults(data);
+        }, 1000);
+        
     } catch (error) {
-        showError(`Failed to review code: ${error.message}`);
+        showError(`Failed to review code: ${error.message}`, 'Code Review Failed');
     } finally {
+        clearInterval(progressInterval);
         hideLoading();
     }
 }
@@ -625,8 +809,8 @@ function updateBrowserDisplay(data) {
         
         return `
             <div class="browser-item ${item.is_directory ? 'directory' : 'file'}" 
-                 onclick="${item.is_directory ? `loadDirectory('${item.path}')` : ''}"
-                 ${item.is_directory ? 'style="cursor: pointer;"' : ''}>
+                 onclick="handleBrowserItemClick(${JSON.stringify(item)}, ${item.is_directory})"
+                 style="cursor: pointer;">
                 <div class="item-icon ${iconClass}">${icon}</div>
                 <div class="item-details">
                     <div class="item-name">${item.name}</div>
@@ -674,3 +858,604 @@ function selectCurrentFolder() {
         stdout: `Selected folder: ${currentBrowsePath}\n\nYou can now proceed with indexing or analysis.`
     });
 }
+
+// Result filtering and search functions
+function filterResults() {
+    const searchTerm = document.getElementById('result-search').value.toLowerCase();
+    const severityFilter = document.getElementById('severity-filter').value;
+    const issues = document.querySelectorAll('.issue');
+    let visibleCount = 0;
+    
+    issues.forEach(issue => {
+        const title = issue.querySelector('.issue-title strong').textContent.toLowerCase();
+        const description = issue.querySelector('.issue-description p')?.textContent.toLowerCase() || '';
+        const severity = issue.getAttribute('data-severity');
+        
+        const matchesSearch = !searchTerm || title.includes(searchTerm) || description.includes(searchTerm);
+        const matchesSeverity = !severityFilter || severity === severityFilter;
+        
+        if (matchesSearch && matchesSeverity) {
+            issue.style.display = 'block';
+            visibleCount++;
+        } else {
+            issue.style.display = 'none';
+        }
+    });
+    
+    // Update stats
+    const totalCount = issues.length;
+    const statsEl = document.getElementById('results-stats');
+    const countEl = document.getElementById('results-count');
+    const filteredEl = document.getElementById('filtered-count');
+    
+    if (totalCount > 0) {
+        statsEl.style.display = 'block';
+        countEl.textContent = `${totalCount} issues found`;
+        
+        if (searchTerm || severityFilter) {
+            filteredEl.style.display = 'inline';
+            filteredEl.textContent = `${visibleCount} shown`;
+        } else {
+            filteredEl.style.display = 'none';
+        }
+    }
+}
+
+function expandAllIssues() {
+    const details = document.querySelectorAll('.issue-details');
+    const buttons = document.querySelectorAll('.btn-toggle');
+    
+    details.forEach(detail => {
+        detail.style.display = 'block';
+    });
+    
+    buttons.forEach(button => {
+        button.textContent = 'Hide';
+    });
+}
+
+function collapseAllIssues() {
+    const details = document.querySelectorAll('.issue-details');
+    const buttons = document.querySelectorAll('.btn-toggle');
+    
+    details.forEach(detail => {
+        detail.style.display = 'none';
+    });
+    
+    buttons.forEach(button => {
+        button.textContent = 'Details';
+    });
+}
+
+
+// Keyboard shortcuts and accessibility
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ctrl/Cmd + Enter to submit forms
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab) {
+                const submitBtn = activeTab.querySelector('.btn-primary');
+                if (submitBtn && !submitBtn.disabled) {
+                    submitBtn.click();
+                }
+            }
+        }
+        
+        // Escape to close modals
+        if (e.key === 'Escape') {
+            const configModal = document.getElementById('config-modal');
+            const folderModal = document.getElementById('folder-browser-modal');
+            
+            if (configModal.style.display === 'flex') {
+                closeConfigModal();
+            } else if (folderModal.style.display === 'flex') {
+                closeFolderBrowser();
+            }
+        }
+        
+        // Ctrl/Cmd + K to focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            const searchInput = document.getElementById('result-search');
+            if (searchInput && searchInput.offsetParent !== null) {
+                searchInput.focus();
+            }
+        }
+        
+        // Tab navigation shortcuts
+        if (e.key === 'Tab') {
+            // Add visual focus indicators
+            document.body.classList.add('keyboard-navigation');
+        }
+    });
+    
+    // Remove keyboard navigation class on mouse use
+    document.addEventListener('mousedown', () => {
+        document.body.classList.remove('keyboard-navigation');
+    });
+}
+
+function setupAccessibility() {
+    // Add ARIA labels and roles
+    const tabs = document.querySelectorAll('.tab-button');
+    tabs.forEach((tab, index) => {
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-selected', tab.classList.contains('active'));
+        tab.setAttribute('tabindex', tab.classList.contains('active') ? '0' : '-1');
+    });
+    
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach((content, index) => {
+        content.setAttribute('role', 'tabpanel');
+        content.setAttribute('aria-labelledby', `tab-${index}`);
+    });
+    
+    // Add skip links
+    const skipLink = document.createElement('a');
+    skipLink.href = '#main-content';
+    skipLink.textContent = 'Skip to main content';
+    skipLink.className = 'skip-link';
+    skipLink.style.cssText = `
+        position: absolute;
+        top: -40px;
+        left: 6px;
+        background: var(--primary-color);
+        color: white;
+        padding: 8px;
+        text-decoration: none;
+        border-radius: 4px;
+        z-index: 10000;
+        transition: top 0.3s;
+    `;
+    skipLink.addEventListener('focus', () => {
+        skipLink.style.top = '6px';
+    });
+    skipLink.addEventListener('blur', () => {
+        skipLink.style.top = '-40px';
+    });
+    document.body.insertBefore(skipLink, document.body.firstChild);
+    
+    // Add main content ID
+    const mainContent = document.querySelector('.container');
+    if (mainContent) {
+        mainContent.id = 'main-content';
+    }
+    
+    // Improve form accessibility
+    const inputs = document.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (!input.getAttribute('aria-label') && !input.getAttribute('aria-labelledby')) {
+            const label = document.querySelector(`label[for="${input.id}"]`);
+            if (label) {
+                input.setAttribute('aria-labelledby', label.id || `label-${input.id}`);
+                if (!label.id) {
+                    label.id = `label-${input.id}`;
+                }
+            }
+        }
+    });
+    
+    // Add loading announcements for screen readers
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+        loadingOverlay.setAttribute('role', 'status');
+        loadingOverlay.setAttribute('aria-live', 'polite');
+    }
+}
+
+// Enhanced tab navigation
+function openTab(evt, tabName) {
+    const tabContents = document.getElementsByClassName('tab-content');
+    for (let content of tabContents) {
+        content.classList.remove('active');
+        content.setAttribute('aria-hidden', 'true');
+    }
+    
+    const tabButtons = document.getElementsByClassName('tab-button');
+    for (let button of tabButtons) {
+        button.classList.remove('active');
+        button.setAttribute('aria-selected', 'false');
+        button.setAttribute('tabindex', '-1');
+    }
+    
+    const targetTab = document.getElementById(tabName);
+    const targetButton = evt.currentTarget;
+    
+    targetTab.classList.add('active');
+    targetTab.setAttribute('aria-hidden', 'false');
+    targetButton.classList.add('active');
+    targetButton.setAttribute('aria-selected', 'true');
+    targetButton.setAttribute('tabindex', '0');
+    
+    // Focus management
+    targetButton.focus();
+}
+
+// Add focus management for modals
+function openConfigModal() {
+    document.getElementById('config-modal').style.display = 'flex';
+    loadStoredConfig();
+    
+    // Focus first input
+    setTimeout(() => {
+        const firstInput = document.querySelector('#config-modal input');
+        if (firstInput) {
+            firstInput.focus();
+        }
+    }, 100);
+}
+
+function openFolderBrowser() {
+    document.getElementById('folder-browser-modal').style.display = 'flex';
+    const currentPath = document.getElementById('codebase-path').value || '.';
+    loadDirectory(currentPath);
+    
+    // Focus first interactive element
+    setTimeout(() => {
+        const firstButton = document.querySelector('#folder-browser-modal .btn');
+        if (firstButton) {
+            firstButton.focus();
+        }
+    }, 100);
+}
+
+
+// Enhanced folder browser with file preview
+function previewFile(filePath, fileName) {
+    const preview = document.getElementById('file-preview');
+    const content = document.getElementById('preview-content');
+    const filename = document.getElementById('preview-filename');
+    
+    preview.style.display = 'block';
+    filename.textContent = fileName;
+    content.innerHTML = '<div class="loading-spinner">Loading file...</div>';
+    
+    // Fetch file content
+    fetch(`/api/preview-file?path=${encodeURIComponent(filePath)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const fileContent = data.content;
+                const fileType = getFileType(fileName);
+                
+                if (fileType === 'text') {
+                    content.innerHTML = `<pre><code>${escapeHtml(fileContent)}</code></pre>`;
+                } else if (fileType === 'image') {
+                    content.innerHTML = `<img src="data:image/${getImageType(fileName)};base64,${fileContent}" alt="${fileName}" style="max-width: 100%; height: auto;">`;
+                } else {
+                    content.innerHTML = `<div class="preview-binary">
+                        <p>Binary file preview not available</p>
+                        <p><strong>File:</strong> ${fileName}</p>
+                        <p><strong>Size:</strong> ${formatFileSize(data.size || 0)}</p>
+                    </div>`;
+                }
+            } else {
+                content.innerHTML = `<div class="error-message">Error loading file: ${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            content.innerHTML = `<div class="error-message">Error loading file: ${error.message}</div>`;
+        });
+}
+
+function closeFilePreview() {
+    document.getElementById('file-preview').style.display = 'none';
+}
+
+function getFileType(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    const textExts = ['txt', 'md', 'py', 'js', 'ts', 'html', 'css', 'json', 'yaml', 'yml', 'xml', 'c', 'cpp', 'h', 'hpp', 'java', 'rs', 'go', 'php', 'rb', 'cs', 'kt', 'swift'];
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
+    
+    if (textExts.includes(ext)) return 'text';
+    if (imageExts.includes(ext)) return 'image';
+    return 'binary';
+}
+
+function getImageType(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    if (ext === 'jpg' || ext === 'jpeg') return 'jpeg';
+    if (ext === 'svg') return 'svg+xml';
+    return ext;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Enhanced browser item click handling
+function handleBrowserItemClick(item, isDirectory) {
+    if (isDirectory) {
+        loadDirectory(item.path);
+    } else {
+        // Preview file
+        previewFile(item.path, item.name);
+    }
+}
+
+
+// Configuration validation
+function validateConfiguration() {
+    const errors = [];
+    const warnings = [];
+    
+    // Validate codebase path
+    const codebasePath = document.getElementById('codebase-path').value.trim();
+    if (!codebasePath) {
+        errors.push('Codebase path is required');
+    } else if (codebasePath === '.') {
+        warnings.push('Using current directory as codebase path');
+    }
+    
+    // Validate project schema
+    const projectSchema = document.getElementById('project-schema').value.trim();
+    if (!projectSchema) {
+        errors.push('Project schema is required');
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(projectSchema)) {
+        errors.push('Project schema must contain only letters, numbers, hyphens, and underscores');
+    }
+    
+    // Validate ChromaDB directory if using ChromaDB backend
+    const backend = document.getElementById('backend').value;
+    if (backend === 'chroma') {
+        const chromaDir = document.getElementById('chroma-dir').value.trim();
+        if (!chromaDir) {
+            errors.push('ChromaDB directory is required when using ChromaDB backend');
+        }
+    }
+    
+    return { errors, warnings };
+}
+
+function showValidationErrors(errors, warnings) {
+    let message = '';
+    
+    if (errors.length > 0) {
+        message += 'Please fix the following errors:\n\n';
+        errors.forEach(error => message += `• ${error}\n`);
+    }
+    
+    if (warnings.length > 0) {
+        message += '\nWarnings:\n\n';
+        warnings.forEach(warning => message += `• ${warning}\n`);
+    }
+    
+    if (errors.length > 0) {
+        showError(message, 'Configuration Errors');
+        return false;
+    } else if (warnings.length > 0) {
+        showWarning(message, 'Configuration Warnings');
+        return true;
+    }
+    
+    return true;
+}
+
+// Enhanced API key validation
+function validateApiKey(key, type) {
+    if (!key || key.trim() === '') {
+        return { valid: false, message: `${type} API key is required` };
+    }
+    
+    const trimmedKey = key.trim();
+    
+    if (type === 'OpenAI') {
+        if (!trimmedKey.startsWith('sk-')) {
+            return { valid: false, message: 'OpenAI API key must start with "sk-"' };
+        }
+        if (trimmedKey.length < 20) {
+            return { valid: false, message: 'OpenAI API key appears to be too short' };
+        }
+    } else if (type === 'Azure') {
+        if (trimmedKey.length < 10) {
+            return { valid: false, message: 'Azure API key appears to be too short' };
+        }
+    }
+    
+    return { valid: true };
+}
+
+// Enhanced configuration save with validation
+async function saveApiConfigWithValidation() {
+    clearConfigMessage();
+    
+    const openaiKey = document.getElementById('openai-key').value.trim();
+    const azureKey = document.getElementById('azure-key').value.trim();
+    const azureEndpoint = document.getElementById('azure-endpoint').value.trim();
+    const azureDeployment = document.getElementById('azure-deployment').value.trim();
+    
+    // Validate API keys
+    if (openaiKey) {
+        const validation = validateApiKey(openaiKey, 'OpenAI');
+        if (!validation.valid) {
+            showConfigMessage(validation.message, true);
+            return;
+        }
+    }
+    
+    if (azureKey) {
+        const validation = validateApiKey(azureKey, 'Azure');
+        if (!validation.valid) {
+            showConfigMessage(validation.message, true);
+            return;
+        }
+        
+        if (azureKey && !azureEndpoint) {
+            showConfigMessage('Azure endpoint is required when using Azure API key', true);
+            return;
+        }
+        
+        if (azureKey && !azureDeployment) {
+            showConfigMessage('Azure deployment name is required when using Azure API key', true);
+            return;
+        }
+    }
+    
+    if (!openaiKey && !azureKey) {
+        showConfigMessage('Please enter at least one API key', true);
+        return;
+    }
+    
+    // Proceed with saving
+    await saveApiConfig();
+}
+
+// Real-time validation
+function setupRealTimeValidation() {
+    // Validate on input change
+    const inputs = ['codebase-path', 'project-schema', 'chroma-dir'];
+    inputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('blur', () => {
+                validateSingleField(id);
+            });
+        }
+    });
+    
+    // Validate API keys on input
+    const apiInputs = ['openai-key', 'azure-key', 'azure-endpoint', 'azure-deployment'];
+    apiInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('blur', () => {
+                validateApiField(id);
+            });
+        }
+    });
+}
+
+function validateSingleField(fieldId) {
+    const field = document.getElementById(fieldId);
+    const value = field.value.trim();
+    
+    // Remove existing validation classes
+    field.classList.remove('field-error', 'field-warning');
+    
+    let isValid = true;
+    let message = '';
+    
+    switch (fieldId) {
+        case 'codebase-path':
+            if (!value) {
+                isValid = false;
+                message = 'Codebase path is required';
+            }
+            break;
+        case 'project-schema':
+            if (!value) {
+                isValid = false;
+                message = 'Project schema is required';
+            } else if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+                isValid = false;
+                message = 'Project schema must contain only letters, numbers, hyphens, and underscores';
+            }
+            break;
+        case 'chroma-dir':
+            if (document.getElementById('backend').value === 'chroma' && !value) {
+                isValid = false;
+                message = 'ChromaDB directory is required when using ChromaDB backend';
+            }
+            break;
+    }
+    
+    if (!isValid) {
+        field.classList.add('field-error');
+        showFieldError(field, message);
+    }
+}
+
+function validateApiField(fieldId) {
+    const field = document.getElementById(fieldId);
+    const value = field.value.trim();
+    
+    // Remove existing validation classes
+    field.classList.remove('field-error', 'field-warning');
+    
+    if (!value) return;
+    
+    let validation = { valid: true };
+    
+    switch (fieldId) {
+        case 'openai-key':
+            validation = validateApiKey(value, 'OpenAI');
+            break;
+        case 'azure-key':
+            validation = validateApiKey(value, 'Azure');
+            break;
+        case 'azure-endpoint':
+            if (value && !value.startsWith('http')) {
+                validation = { valid: false, message: 'Azure endpoint must be a valid URL' };
+            }
+            break;
+    }
+    
+    if (!validation.valid) {
+        field.classList.add('field-error');
+        showFieldError(field, validation.message);
+    }
+}
+
+function showFieldError(field, message) {
+    // Remove existing error message
+    const existingError = field.parentNode.querySelector('.field-error-message');
+    if (existingError) {
+        existingError.remove();
+    }
+    
+    // Add new error message
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'field-error-message';
+    errorDiv.textContent = message;
+    errorDiv.style.cssText = 'color: var(--error-color); font-size: 0.8rem; margin-top: 4px;';
+    
+    field.parentNode.appendChild(errorDiv);
+    
+    // Remove error after 5 seconds
+    setTimeout(() => {
+        if (errorDiv.parentNode) {
+            errorDiv.remove();
+        }
+        field.classList.remove('field-error');
+    }, 5000);
+}
+
+
+// Dark mode and theme functionality
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('metis-theme', newTheme);
+    
+    // Update theme toggle button
+    const themeToggle = document.getElementById('theme-toggle');
+    themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    themeToggle.title = newTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+}
+
+function loadTheme() {
+    const savedTheme = localStorage.getItem('metis-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+    
+    document.documentElement.setAttribute('data-theme', theme);
+    
+    // Update theme toggle button
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+        themeToggle.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+    }
+}
+
+// Listen for system theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!localStorage.getItem('metis-theme')) {
+        loadTheme();
+    }
+});

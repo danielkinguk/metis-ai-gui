@@ -451,6 +451,58 @@ def browse_directories():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/preview-file', methods=['GET'])
+def preview_file():
+    """Preview file content for the folder browser."""
+    file_path = request.args.get('path', '')
+    
+    if not file_path:
+        return jsonify({'success': False, 'error': 'File path is required'}), 400
+    
+    try:
+        path_obj = Path(file_path).resolve()
+        
+        # Security check - ensure file is within reasonable bounds
+        if not path_obj.exists() or not path_obj.is_file():
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        # Check file size (limit to 1MB for preview)
+        file_size = path_obj.stat().st_size
+        if file_size > 1024 * 1024:  # 1MB limit
+            return jsonify({'success': False, 'error': 'File too large for preview'}), 413
+        
+        # Determine file type
+        file_ext = path_obj.suffix.lower()
+        text_extensions = {'.txt', '.md', '.py', '.js', '.ts', '.html', '.css', '.json', '.yaml', '.yml', '.xml', 
+                          '.c', '.cpp', '.h', '.hpp', '.java', '.rs', '.go', '.php', '.rb', '.cs', '.kt', '.swift'}
+        
+        if file_ext in text_extensions:
+            # Read as text
+            try:
+                with open(path_obj, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                return jsonify({
+                    'success': True,
+                    'content': content,
+                    'type': 'text',
+                    'size': file_size
+                })
+            except UnicodeDecodeError:
+                return jsonify({'success': False, 'error': 'File contains binary data'}), 400
+        else:
+            # For binary files, return basic info
+            return jsonify({
+                'success': True,
+                'content': '',
+                'type': 'binary',
+                'size': file_size
+            })
+    
+    except PermissionError:
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/test-connection', methods=['POST'])
 def test_connection():
     """Test API connection with provided or stored keys."""

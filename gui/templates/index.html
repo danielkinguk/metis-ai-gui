@@ -14,6 +14,7 @@
             <div id="status-indicator" class="status">
                 <span class="status-dot"></span>
                 <span class="status-text">Checking configuration...</span>
+                <button class="btn btn-small btn-theme" onclick="toggleTheme()" id="theme-toggle" title="Toggle dark mode">🌙</button>
                 <button class="btn btn-small btn-config" onclick="openConfigModal()">⚙️ Configure API</button>
             </div>
         </header>
@@ -118,10 +119,32 @@
         </div>
 
         <div class="results-panel" id="results" style="display: none;">
-            <h3>Results</h3>
-            <div class="result-actions">
-                <button class="btn btn-small" onclick="clearResults()">Clear</button>
-                <button class="btn btn-small" id="download-btn" style="display: none;" onclick="downloadResults()">Download JSON</button>
+            <div class="results-header">
+                <h3>Results</h3>
+                <div class="result-actions">
+                    <button class="btn btn-small" onclick="clearResults()">Clear</button>
+                    <button class="btn btn-small" id="download-btn" style="display: none;" onclick="downloadResults()">Download JSON</button>
+                </div>
+            </div>
+            <div class="results-controls" id="results-controls" style="display: none;">
+                <div class="search-box">
+                    <input type="text" id="result-search" placeholder="Search results..." onkeyup="filterResults()">
+                    <span class="search-icon">🔍</span>
+                </div>
+                <div class="filter-controls">
+                    <select id="severity-filter" onchange="filterResults()">
+                        <option value="">All Severities</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <button class="btn btn-small" onclick="expandAllIssues()">Expand All</button>
+                    <button class="btn btn-small" onclick="collapseAllIssues()">Collapse All</button>
+                </div>
+            </div>
+            <div class="results-stats" id="results-stats" style="display: none;">
+                <span id="results-count">0 issues found</span>
+                <span id="filtered-count" style="display: none;">0 filtered</span>
             </div>
             <div id="result-content"></div>
         </div>
@@ -173,7 +196,7 @@
                     </div>
 
                     <div class="modal-actions">
-                        <button class="btn btn-primary" onclick="saveApiConfig()">Save Configuration</button>
+                        <button class="btn btn-primary" onclick="saveApiConfigWithValidation()">Save Configuration</button>
                         <button class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
                         <button class="btn btn-danger" onclick="clearApiConfig()">Clear All Keys</button>
                     </div>
@@ -199,8 +222,19 @@
                         </div>
                     </div>
                     
-                    <div class="browser-content" id="browser-content">
-                        <div class="loading-spinner">Loading directories...</div>
+                    <div class="browser-main">
+                        <div class="browser-content" id="browser-content">
+                            <div class="loading-spinner">Loading directories...</div>
+                        </div>
+                        <div class="file-preview" id="file-preview" style="display: none;">
+                            <div class="preview-header">
+                                <h4 id="preview-filename">File Preview</h4>
+                                <button class="btn btn-small" onclick="closeFilePreview()">✕</button>
+                            </div>
+                            <div class="preview-content" id="preview-content">
+                                <div class="loading-spinner">Loading file...</div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="browser-footer">
