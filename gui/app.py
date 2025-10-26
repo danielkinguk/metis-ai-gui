@@ -128,14 +128,44 @@ def run_metis_command(command, args=None):
             cwd=Path(__file__).parent.parent
         )
         
+        # Filter out common warnings from stderr
+        stderr_lines = result.stderr.split('\n') if result.stderr else []
+        filtered_stderr = []
+        skip_next_lines = 0
+
+        for line in stderr_lines:
+            # If we're in the middle of skipping warning lines
+            if skip_next_lines > 0:
+                skip_next_lines -= 1
+                continue
+
+            # Skip Pydantic warnings and related lines
+            if 'UnsupportedFieldAttributeWarning' in line:
+                skip_next_lines = 2  # Skip the next 2 lines of the warning
+                continue
+            if 'validate_default' in line:
+                continue
+            if 'warnings.warn' in line:
+                continue
+            if '_generate_schema.py' in line and 'UnsupportedFieldAttributeWarning' in line:
+                continue
+            if line.strip().startswith('warnings.warn('):
+                continue
+
+            # Only keep non-empty lines
+            if line.strip():
+                filtered_stderr.append(line)
+
+        filtered_stderr_text = '\n'.join(filtered_stderr) if filtered_stderr else ''
+
         response = {
             'success': result.returncode == 0,
             'stdout': result.stdout,
-            'stderr': result.stderr,
+            'stderr': filtered_stderr_text,
             'output_file': None,
             'results': None
         }
-        
+
         if output_file.exists():
             try:
                 with open(output_file, 'r') as f:
@@ -143,7 +173,29 @@ def run_metis_command(command, args=None):
                 response['output_file'] = str(output_file)
             except json.JSONDecodeError:
                 logger.error(f"Failed to parse JSON from {output_file}")
-        
+        else:
+            # If no output file but command succeeded, provide helpful message
+            if result.returncode == 0:
+                if not result.stdout and not filtered_stderr_text:
+                    response['stdout'] = 'Operation completed successfully.'
+                logger.warning(f"Output file not created: {output_file}")
+
+        # Check for common error messages in stdout/stderr and provide helpful feedback
+        combined_output = (response['stdout'] or '') + (response['stderr'] or '')
+        if 'OPENAI_API_KEY environment variable is required' in combined_output or \
+           'AZURE_OPENAI_API_KEY' in combined_output:
+            response['success'] = False
+            response['error'] = 'API key not configured. Please click "⚙️ Configure API" in the header to set up your OpenAI or Azure OpenAI API key before using Metis.'
+            response['stdout'] = ''
+            response['stderr'] = ''
+        elif not response['success'] and response['stdout']:
+            # If command failed with stdout, treat stdout as error message
+            response['error'] = response['stdout']
+            response['stdout'] = ''
+
+        # Log the response for debugging
+        logger.info(f"Response: success={response['success']}, has_results={response['results'] is not None}, has_error={response.get('error') is not None}")
+
         return response
     except subprocess.TimeoutExpired:
         return {'success': False, 'error': 'Command timed out after 5 minutes'}

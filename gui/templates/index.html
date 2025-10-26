@@ -14,7 +14,6 @@
             <div id="status-indicator" class="status">
                 <span class="status-dot"></span>
                 <span class="status-text">Checking configuration...</span>
-                <button class="btn btn-small btn-theme" onclick="toggleTheme()" id="theme-toggle" title="Toggle dark mode">🌙</button>
                 <button class="btn btn-small btn-config" onclick="openConfigModal()">⚙️ Configure API</button>
             </div>
         </header>
@@ -32,7 +31,7 @@
                 <div class="config-item">
                     <label for="language">Language Plugin:</label>
                     <select id="language">
-                        <option value="c">C</option>
+                        <option value="c">C/C++</option>
                         <option value="python">Python</option>
                         <option value="rust">Rust</option>
                     </select>
@@ -55,67 +54,62 @@
             </div>
         </div>
 
-        <div class="tabs">
-            <button class="tab-button active" onclick="openTab(event, 'index-tab')">Index</button>
-            <button class="tab-button" onclick="openTab(event, 'ask-tab')">Ask</button>
-            <button class="tab-button" onclick="openTab(event, 'review-patch-tab')">Review Patch</button>
-            <button class="tab-button" onclick="openTab(event, 'review-file-tab')">Review File</button>
-            <button class="tab-button" onclick="openTab(event, 'review-code-tab')">Review Code</button>
-            <button class="tab-button" onclick="openTab(event, 'update-tab')">Update Index</button>
-        </div>
+        <div class="config-panel">
+            <h3>Analysis Operations</h3>
+            <div class="tabs">
+                <button class="tab-button active" onclick="openTab(event, 'index-tab')">Index</button>
+                <button class="tab-button" onclick="openTab(event, 'review-file-tab')">Review File</button>
+                <button class="tab-button" onclick="openTab(event, 'review-patch-tab')">Review Patch</button>
+                <button class="tab-button" onclick="openTab(event, 'update-tab')">Update Index</button>
+            </div>
 
-        <div id="index-tab" class="tab-content active">
-            <h2>Index Codebase</h2>
-            <p>Build the vector database index for your codebase. This is required before performing reviews or asking questions.</p>
-            <button class="btn btn-primary" onclick="indexCodebase()">Start Indexing</button>
-            <div class="progress-bar" id="index-progress" style="display: none;">
-                <div class="progress-fill"></div>
+            <div id="index-tab" class="tab-content active">
+                <h2>Index Codebase</h2>
+                <p>Build the vector database index for your codebase. This is required before performing reviews or asking questions.</p>
+                <button class="btn btn-primary" onclick="indexCodebase()">Start Indexing</button>
+                <div class="progress-bar" id="index-progress" style="display: none;">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+
+            <div id="review-patch-tab" class="tab-content">
+                <h2>Review Patch</h2>
+                <p>Upload a patch file to review for security issues.</p>
+                <div class="file-upload">
+                    <input type="file" id="patch-file" accept=".patch,.diff,.txt">
+                    <label for="patch-file" class="file-label">Choose patch file...</label>
+                    <span id="patch-filename"></span>
+                </div>
+                <button class="btn btn-primary" onclick="reviewPatch()">Review Patch</button>
+            </div>
+
+            <div id="review-file-tab" class="tab-content">
+                <h2>Review File</h2>
+                <p>Review a specific file in your codebase for security issues.</p>
+                <input type="text" id="file-path" placeholder="Enter file path (e.g., src/main.c)">
+                <button class="btn btn-primary" onclick="reviewFile()">Review File</button>
+            </div>
+
+            <div id="update-tab" class="tab-content">
+                <h2>Update Index</h2>
+                <p>Update the vector database index with changes from a patch file.</p>
+                <div class="file-upload">
+                    <input type="file" id="update-patch-file" accept=".patch,.diff,.txt">
+                    <label for="update-patch-file" class="file-label">Choose patch file...</label>
+                    <span id="update-patch-filename"></span>
+                </div>
+                <button class="btn btn-primary" onclick="updateIndex()">Update Index</button>
             </div>
         </div>
 
-        <div id="ask-tab" class="tab-content">
-            <h2>Ask Questions</h2>
-            <p>Ask security-related questions about your codebase.</p>
-            <textarea id="question" rows="4" placeholder="Enter your question here..."></textarea>
-            <button class="btn btn-primary" onclick="askQuestion()">Ask</button>
-        </div>
-
-        <div id="review-patch-tab" class="tab-content">
-            <h2>Review Patch</h2>
-            <p>Upload a patch file to review for security issues.</p>
-            <div class="file-upload">
-                <input type="file" id="patch-file" accept=".patch,.diff,.txt">
-                <label for="patch-file" class="file-label">Choose patch file...</label>
-                <span id="patch-filename"></span>
+        <div class="config-panel">
+            <h3>Security Review</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">Ask security-related questions about your codebase.</p>
+            <div class="config-item">
+                <label for="question">Your Question:</label>
+                <textarea id="question" rows="4" style="width: 100%; margin-bottom: 15px;">Perform a basic security review of my code.</textarea>
+                <button class="btn btn-primary" onclick="askQuestion()">Ask Question</button>
             </div>
-            <button class="btn btn-primary" onclick="reviewPatch()">Review Patch</button>
-        </div>
-
-        <div id="review-file-tab" class="tab-content">
-            <h2>Review File</h2>
-            <p>Review a specific file in your codebase for security issues.</p>
-            <input type="text" id="file-path" placeholder="Enter file path (e.g., src/main.c)">
-            <button class="btn btn-primary" onclick="reviewFile()">Review File</button>
-        </div>
-
-        <div id="review-code-tab" class="tab-content">
-            <h2>Review Entire Codebase</h2>
-            <p>Perform a comprehensive security review of your entire codebase.</p>
-            <button class="btn btn-primary" onclick="reviewCode()">Start Full Review</button>
-            <div class="warning">
-                <strong>⚠️ Note:</strong> Full codebase review may take considerable time depending on the size of your project.
-            </div>
-        </div>
-
-        <div id="update-tab" class="tab-content">
-            <h2>Update Index</h2>
-            <p>Update the vector database index with changes from a patch file.</p>
-            <div class="file-upload">
-                <input type="file" id="update-patch-file" accept=".patch,.diff,.txt">
-                <label for="update-patch-file" class="file-label">Choose patch file...</label>
-                <span id="update-patch-filename"></span>
-            </div>
-            <button class="btn btn-primary" onclick="updateIndex()">Update Index</button>
         </div>
 
         <div class="results-panel" id="results" style="display: none;">
@@ -123,6 +117,7 @@
                 <h3>Results</h3>
                 <div class="result-actions">
                     <button class="btn btn-small" onclick="clearResults()">Clear</button>
+                    <button class="btn btn-small" id="download-text-btn" style="display: none;" onclick="downloadResultsAsText()">Download Text</button>
                     <button class="btn btn-small" id="download-btn" style="display: none;" onclick="downloadResults()">Download JSON</button>
                 </div>
             </div>
@@ -152,6 +147,7 @@
         <div id="loading-overlay" class="loading-overlay" style="display: none;">
             <div class="spinner"></div>
             <p>Processing request...</p>
+            <button class="btn btn-danger" onclick="cancelOperation()" style="margin-top: 20px;">Cancel Operation</button>
         </div>
 
         <!-- API Configuration Modal -->

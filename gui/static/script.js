@@ -1,4 +1,6 @@
 let currentResultFile = null;
+let currentResultData = null;
+let currentAbortController = null;
 
 // Check API status on load
 window.addEventListener('DOMContentLoaded', () => {
@@ -98,20 +100,37 @@ function showLoading(message = 'Processing request...') {
     const messageEl = overlay.querySelector('p');
     messageEl.textContent = message;
     overlay.style.display = 'flex';
+
+    // Create new AbortController for this operation
+    currentAbortController = new AbortController();
 }
 
 function hideLoading() {
     document.getElementById('loading-overlay').style.display = 'none';
+    currentAbortController = null;
+}
+
+function cancelOperation() {
+    if (currentAbortController) {
+        currentAbortController.abort();
+        hideLoading();
+        showWarning('Operation cancelled by user', 'Cancelled');
+    }
 }
 
 function showProgress(message, progress = null) {
     const overlay = document.getElementById('loading-overlay');
     const messageEl = overlay.querySelector('p');
     const spinner = overlay.querySelector('.spinner');
-    
+
     messageEl.textContent = message;
     overlay.style.display = 'flex';
-    
+
+    // Create new AbortController if not already created
+    if (!currentAbortController) {
+        currentAbortController = new AbortController();
+    }
+
     if (progress !== null) {
         // Add progress bar if not exists
         let progressBar = overlay.querySelector('.progress-bar');
@@ -121,10 +140,10 @@ function showProgress(message, progress = null) {
             progressBar.innerHTML = '<div class="progress-fill"></div>';
             overlay.appendChild(progressBar);
         }
-        
+
         const progressFill = progressBar.querySelector('.progress-fill');
         progressFill.style.width = `${progress}%`;
-        
+
         if (progress >= 100) {
             setTimeout(() => {
                 progressBar.remove();
@@ -137,16 +156,19 @@ function showResults(data) {
     const resultsPanel = document.getElementById('results');
     const resultContent = document.getElementById('result-content');
     const downloadBtn = document.getElementById('download-btn');
+    const downloadTextBtn = document.getElementById('download-text-btn');
     const controlsEl = document.getElementById('results-controls');
-    
+
     resultsPanel.style.display = 'block';
-    
+
     if (data.success) {
         if (data.results) {
             resultContent.innerHTML = formatResults(data.results);
             currentResultFile = data.output_file;
+            currentResultData = data.results;
             downloadBtn.style.display = 'inline-block';
-            
+            downloadTextBtn.style.display = 'inline-block';
+
             // Show controls if there are issues
             const issues = document.querySelectorAll('.issue');
             if (issues.length > 0) {
@@ -162,6 +184,14 @@ function showResults(data) {
                 <div class="message-content">${data.stdout}</div>
             </div>`;
             controlsEl.style.display = 'none';
+
+            // Store data and show download buttons for stdout results too
+            currentResultFile = data.output_file;
+            currentResultData = data.stdout;
+            if (data.output_file) {
+                downloadBtn.style.display = 'inline-block';
+            }
+            downloadTextBtn.style.display = 'inline-block';
         } else {
             resultContent.innerHTML = `<div class="message success">
                 <div class="message-header">
@@ -266,7 +296,9 @@ function clearResults() {
     document.getElementById('results-controls').style.display = 'none';
     document.getElementById('results-stats').style.display = 'none';
     currentResultFile = null;
+    currentResultData = null;
     document.getElementById('download-btn').style.display = 'none';
+    document.getElementById('download-text-btn').style.display = 'none';
     // Clear search and filter
     document.getElementById('result-search').value = '';
     document.getElementById('severity-filter').value = '';
@@ -276,6 +308,89 @@ function downloadResults() {
     if (currentResultFile) {
         window.open(`/api/download/${currentResultFile.split('/').pop()}`, '_blank');
     }
+}
+
+function downloadResultsAsText() {
+    if (!currentResultData) {
+        return;
+    }
+
+    let textContent = '';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    // Convert results to text format
+    if (Array.isArray(currentResultData)) {
+        textContent = '='.repeat(80) + '\n';
+        textContent += 'METIS SECURITY REVIEW RESULTS\n';
+        textContent += '='.repeat(80) + '\n\n';
+        textContent += `Generated: ${new Date().toLocaleString()}\n`;
+        textContent += `Total Issues Found: ${currentResultData.length}\n`;
+        textContent += '='.repeat(80) + '\n\n';
+
+        currentResultData.forEach((issue, index) => {
+            textContent += `\n${'─'.repeat(80)}\n`;
+            textContent += `ISSUE #${index + 1}\n`;
+            textContent += `${'─'.repeat(80)}\n\n`;
+
+            textContent += `Severity: ${(issue.severity || 'MEDIUM').toUpperCase()}\n`;
+            textContent += `Title: ${issue.title || issue.message || 'Security Issue'}\n`;
+
+            if (issue.file) {
+                textContent += `File: ${issue.file}\n`;
+            }
+            if (issue.line || issue.line_number) {
+                textContent += `Line: ${issue.line || issue.line_number}\n`;
+            }
+            if (issue.cwe) {
+                textContent += `CWE: ${issue.cwe}\n`;
+            }
+
+            textContent += `\nDescription:\n`;
+            textContent += `${issue.description || issue.message || 'No description available'}\n`;
+
+            if (issue.recommendation) {
+                textContent += `\nRecommendation:\n`;
+                textContent += `${issue.recommendation}\n`;
+            }
+
+            if (issue.code_snippet) {
+                textContent += `\nCode Snippet:\n`;
+                textContent += `${'-'.repeat(40)}\n`;
+                textContent += `${issue.code_snippet}\n`;
+                textContent += `${'-'.repeat(40)}\n`;
+            }
+        });
+
+        textContent += `\n${'='.repeat(80)}\n`;
+        textContent += `END OF REPORT\n`;
+        textContent += `${'='.repeat(80)}\n`;
+    } else if (typeof currentResultData === 'string') {
+        // For text results like from Ask Question
+        textContent = '='.repeat(80) + '\n';
+        textContent += 'METIS SECURITY REVIEW RESULTS\n';
+        textContent += '='.repeat(80) + '\n\n';
+        textContent += `Generated: ${new Date().toLocaleString()}\n`;
+        textContent += '='.repeat(80) + '\n\n';
+        textContent += currentResultData;
+        textContent += `\n\n${'='.repeat(80)}\n`;
+        textContent += `END OF REPORT\n`;
+        textContent += `${'='.repeat(80)}\n`;
+    } else if (typeof currentResultData === 'object') {
+        textContent = JSON.stringify(currentResultData, null, 2);
+    } else {
+        textContent = currentResultData.toString();
+    }
+
+    // Create and download the file
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `metis-results-${timestamp}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
 }
 
 function showError(message, title = 'Error') {
@@ -324,7 +439,8 @@ async function indexCodebase() {
         const response = await fetch('/api/index', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(getConfig())
+            body: JSON.stringify(getConfig()),
+            signal: currentAbortController.signal
         });
         
         if (!response.ok) {
@@ -342,6 +458,10 @@ async function indexCodebase() {
         }, 1000);
         
     } catch (error) {
+        if (error.name === 'AbortError') {
+            // Operation was cancelled, message already shown
+            return;
+        }
         showError(`Failed to index codebase: ${error.message}`, 'Indexing Failed');
     } finally {
         clearInterval(progressInterval);
@@ -367,7 +487,8 @@ async function askQuestion() {
         const response = await fetch('/api/ask', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
+            body: JSON.stringify(config),
+            signal: currentAbortController.signal
         });
         
         if (!response.ok) {
@@ -378,6 +499,9 @@ async function askQuestion() {
         const data = await response.json();
         showResults(data);
     } catch (error) {
+        if (error.name === 'AbortError') {
+            return;
+        }
         showError(`Failed to process question: ${error.message}`, 'Question Processing Failed');
     } finally {
         hideLoading();
@@ -405,12 +529,16 @@ async function reviewPatch() {
         
         const response = await fetch('/api/review-patch', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: currentAbortController.signal
         });
         
         const data = await response.json();
         showResults(data);
     } catch (error) {
+        if (error.name === 'AbortError') {
+            return;
+        }
         showError(`Failed to review patch: ${error.message}`);
     } finally {
         hideLoading();
@@ -434,12 +562,16 @@ async function reviewFile() {
         const response = await fetch('/api/review-file', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
+            body: JSON.stringify(config),
+            signal: currentAbortController.signal
         });
         
         const data = await response.json();
         showResults(data);
     } catch (error) {
+        if (error.name === 'AbortError') {
+            return;
+        }
         showError(`Failed to review file: ${error.message}`);
     } finally {
         hideLoading();
@@ -463,7 +595,8 @@ async function reviewCode() {
         const response = await fetch('/api/review-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(getConfig())
+            body: JSON.stringify(getConfig()),
+            signal: currentAbortController.signal
         });
         
         if (!response.ok) {
@@ -480,6 +613,9 @@ async function reviewCode() {
         }, 1000);
         
     } catch (error) {
+        if (error.name === 'AbortError') {
+            return;
+        }
         showError(`Failed to review code: ${error.message}`, 'Code Review Failed');
     } finally {
         clearInterval(progressInterval);
@@ -508,12 +644,16 @@ async function updateIndex() {
         
         const response = await fetch('/api/update', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: currentAbortController.signal
         });
         
         const data = await response.json();
         showResults(data);
     } catch (error) {
+        if (error.name === 'AbortError') {
+            return;
+        }
         showError(`Failed to update index: ${error.message}`);
     } finally {
         hideLoading();
@@ -761,7 +901,7 @@ function updateBrowserDisplay(data) {
         return;
     }
     
-    const itemsHtml = data.items.map(item => {
+    const itemsHtml = data.items.map((item, index) => {
         let icon, iconClass;
         if (item.is_directory) {
             if (item.has_code) {
@@ -803,13 +943,15 @@ function updateBrowserDisplay(data) {
                 iconClass = 'file';
             }
         }
-        
+
         const codeIndicator = item.has_code ? '<span class="code-badge">CODE</span>' : '';
         const sizeText = item.is_directory ? '' : formatFileSize(item.size);
-        
+
         return `
-            <div class="browser-item ${item.is_directory ? 'directory' : 'file'}" 
-                 onclick="handleBrowserItemClick(${JSON.stringify(item)}, ${item.is_directory})"
+            <div class="browser-item ${item.is_directory ? 'directory' : 'file'}"
+                 data-path="${item.path.replace(/"/g, '&quot;')}"
+                 data-name="${item.name.replace(/"/g, '&quot;')}"
+                 data-is-directory="${item.is_directory}"
                  style="cursor: pointer;">
                 <div class="item-icon ${iconClass}">${icon}</div>
                 <div class="item-details">
@@ -822,8 +964,23 @@ function updateBrowserDisplay(data) {
             </div>
         `;
     }).join('');
-    
+
     content.innerHTML = itemsHtml;
+
+    // Add click event listeners to all browser items
+    content.querySelectorAll('.browser-item').forEach(itemEl => {
+        itemEl.addEventListener('click', () => {
+            const path = itemEl.getAttribute('data-path');
+            const name = itemEl.getAttribute('data-name');
+            const isDirectory = itemEl.getAttribute('data-is-directory') === 'true';
+
+            if (isDirectory) {
+                loadDirectory(path);
+            } else {
+                previewFile(path, name);
+            }
+        });
+    });
 }
 
 function formatFileSize(bytes) {

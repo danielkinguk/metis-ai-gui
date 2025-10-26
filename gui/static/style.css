@@ -193,14 +193,6 @@ h1 {
     color: var(--text-primary);
     font-size: 1.25rem;
     font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.config-panel h3::before {
-    content: '⚙️';
-    font-size: 1.1rem;
 }
 
 .config-grid {
@@ -377,6 +369,7 @@ textarea {
     padding: 15px;
     border-radius: 6px;
     margin-top: 20px;
+    color: #92400e;
 }
 
 .warning strong {
