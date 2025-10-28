@@ -8,7 +8,7 @@ import tempfile
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import uuid
@@ -20,8 +20,11 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'metis-gui-secret-key-change-in-production')
 CORS(app)
 
+# Project root and common dirs
+ROOT_DIR = Path(__file__).resolve().parent.parent
+
 # .env file location (in project root)
-ENV_FILE = Path(__file__).parent.parent / '.env'
+ENV_FILE = ROOT_DIR / '.env'
 
 # Default folder for the Browse dialog
 DEFAULT_BROWSE_START = Path(
@@ -38,12 +41,12 @@ if ENV_FILE.exists():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-UPLOAD_FOLDER = Path('uploads')
-RESULTS_FOLDER = Path('results')
+UPLOAD_FOLDER = ROOT_DIR / 'uploads'
+RESULTS_FOLDER = ROOT_DIR / 'results'
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 RESULTS_FOLDER.mkdir(exist_ok=True)
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['UPLOAD_FOLDER'] = str(UPLOAD_FOLDER)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 ALLOWED_EXTENSIONS = {'patch', 'diff', 'txt', 'py', 'c', 'cpp', 'js', 'rs', 'go', 'java'}
@@ -182,7 +185,9 @@ def run_metis_command(command, args=None):
                     response['results'] = json.load(f)
                 response['output_file'] = str(output_file)
             except json.JSONDecodeError:
+                # Even if parsing fails, expose the output file for manual download
                 logger.error(f"Failed to parse JSON from {output_file}")
+                response['output_file'] = str(output_file)
         else:
             # If no output file but command succeeded, provide helpful message
             if result.returncode == 0:
@@ -371,11 +376,23 @@ def update_index():
 
 @app.route('/api/download/<path:filename>')
 def download_result(filename):
-    """Download a result file."""
-    file_path = RESULTS_FOLDER / filename
-    if file_path.exists() and file_path.is_file():
-        return send_file(str(file_path), as_attachment=True)
-    return jsonify({'error': 'File not found'}), 404
+    """Download a result file safely from the results directory."""
+    try:
+        # Normalize to basename to prevent directory traversal
+        safe_name = os.path.basename(filename)
+        file_path = RESULTS_FOLDER / safe_name
+
+        if file_path.exists() and file_path.is_file():
+            # Use send_from_directory for safer path handling
+            return send_from_directory(
+                directory=str(RESULTS_FOLDER),
+                path=safe_name,
+                as_attachment=True,
+            )
+        return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        logger.exception(f"Error serving download for {filename}: {e}")
+        return jsonify({'error': 'Internal server error serving download'}), 500
 
 @app.route('/api/status', methods=['GET'])
 def status():

@@ -158,6 +158,7 @@ function showResults(data) {
     const downloadBtn = document.getElementById('download-btn');
     const downloadTextBtn = document.getElementById('download-text-btn');
     const controlsEl = document.getElementById('results-controls');
+    const sevRow = document.getElementById('severity-counters');
 
     resultsPanel.style.display = 'block';
 
@@ -174,6 +175,10 @@ function showResults(data) {
             if (issues.length > 0) {
                 controlsEl.style.display = 'block';
                 filterResults(); // Initialize stats
+                updateSeverityCounters();
+                if (sevRow) sevRow.style.display = 'grid';
+            } else {
+                if (sevRow) sevRow.style.display = 'none';
             }
         } else if (data.stdout) {
             const messageType = data.warning ? 'warning' : 'success';
@@ -184,6 +189,7 @@ function showResults(data) {
                 <div class="message-content">${data.stdout}</div>
             </div>`;
             controlsEl.style.display = 'none';
+            if (sevRow) sevRow.style.display = 'none';
 
             // Store data and show download buttons for stdout results too
             currentResultFile = data.output_file;
@@ -200,6 +206,7 @@ function showResults(data) {
                 <div class="message-content">Operation completed successfully.</div>
             </div>`;
             controlsEl.style.display = 'none';
+            if (sevRow) sevRow.style.display = 'none';
         }
     } else {
         resultContent.innerHTML = `<div class="message error">
@@ -209,6 +216,7 @@ function showResults(data) {
             <div class="message-content">${data.error || data.stderr || 'Unknown error occurred'}</div>
         </div>`;
         controlsEl.style.display = 'none';
+        if (sevRow) sevRow.style.display = 'none';
     }
     
     resultsPanel.scrollIntoView({ behavior: 'smooth' });
@@ -295,6 +303,13 @@ function clearResults() {
     document.getElementById('result-content').innerHTML = '';
     document.getElementById('results-controls').style.display = 'none';
     document.getElementById('results-stats').style.display = 'none';
+    const sevRow = document.getElementById('severity-counters');
+    if (sevRow) {
+        sevRow.style.display = 'none';
+        document.getElementById('sev-high').textContent = '0';
+        document.getElementById('sev-medium').textContent = '0';
+        document.getElementById('sev-low').textContent = '0';
+    }
     currentResultFile = null;
     currentResultData = null;
     document.getElementById('download-btn').style.display = 'none';
@@ -305,9 +320,39 @@ function clearResults() {
 }
 
 function downloadResults() {
+    // Prefer server-side file when available
     if (currentResultFile) {
-        window.open(`/api/download/${currentResultFile.split('/').pop()}`, '_blank');
+        const base = currentResultFile.split('/').pop();
+        if (base) {
+            window.open(`/api/download/${base}`);
+            return;
+        }
     }
+
+    // Fallback: if we have in-memory results, serialize and download client-side
+    if (currentResultData) {
+        try {
+            const payload = typeof currentResultData === 'string'
+                ? currentResultData
+                : JSON.stringify(currentResultData, null, 2);
+            const blob = new Blob([payload], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            a.href = url;
+            a.download = `metis-results-${timestamp}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            return;
+        } catch (e) {
+            showError(`Failed to prepare JSON download: ${e.message}`);
+            return;
+        }
+    }
+
+    showWarning('No results available to download yet. Run an operation first.', 'Nothing to Download');
 }
 
 function downloadResultsAsText() {
@@ -1158,6 +1203,61 @@ function filterResults() {
             filteredEl.style.display = 'none';
         }
     }
+
+    // Update severity counters based on currently visible issues
+    updateSeverityCounters();
+}
+
+function normalizeSeverity(val) {
+    if (!val) return '';
+    const s = String(val).trim().toLowerCase();
+    if (s === 'critical' || s === 'high') return 'high';
+    if (s === 'medium' || s === 'med' || s === 'mid') return 'medium';
+    if (s === 'low') return 'low';
+    return '';
+}
+
+function updateSeverityCounters() {
+    const sevRow = document.getElementById('severity-counters');
+    if (!sevRow) return;
+
+    // Prefer counting from visible DOM issues if present
+    const issues = Array.from(document.querySelectorAll('.issue'));
+    let counts = { high: 0, medium: 0, low: 0 };
+
+    if (issues.length > 0) {
+        issues.forEach(issue => {
+            if (issue.style.display === 'none') return; // respect current filter
+            const sev = normalizeSeverity(issue.getAttribute('data-severity'));
+            if (sev && counts[sev] !== undefined) counts[sev] += 1;
+        });
+    } else if (currentResultData) {
+        // Fallback to raw data structure
+        // Supported shapes: Array of issues; or { reviews: [ { reviews: [ issues ] } ] }
+        const addIssue = (obj) => {
+            const sev = normalizeSeverity(obj?.severity);
+            if (sev && counts[sev] !== undefined) counts[sev] += 1;
+        };
+
+        if (Array.isArray(currentResultData)) {
+            currentResultData.forEach(addIssue);
+        } else if (typeof currentResultData === 'object' && currentResultData !== null) {
+            const groups = currentResultData.reviews || [];
+            groups.forEach(g => {
+                if (Array.isArray(g?.reviews)) {
+                    g.reviews.forEach(addIssue);
+                }
+            });
+        }
+    }
+
+    document.getElementById('sev-high').textContent = counts.high;
+    document.getElementById('sev-medium').textContent = counts.medium;
+    document.getElementById('sev-low').textContent = counts.low;
+
+    // Show row if there is at least one issue counted
+    const total = counts.high + counts.medium + counts.low;
+    sevRow.style.display = total > 0 ? 'grid' : 'none';
 }
 
 function expandAllIssues() {

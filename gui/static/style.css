@@ -391,6 +391,35 @@ textarea {
     margin-bottom: 20px;
 }
 
+.severity-counters {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 10px 0 18px 0;
+}
+
+.severity-chip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    font-weight: 600;
+}
+
+.severity-chip .label { color: var(--text-primary); }
+.severity-chip .count { font-variant-numeric: tabular-nums; }
+
+.severity-chip.high { border-left: 4px solid var(--error-color); }
+.severity-chip.medium { border-left: 4px solid var(--warning-color); }
+.severity-chip.low { border-left: 4px solid var(--success-color); }
+
+[data-theme="dark"] .severity-chip {
+    background: var(--bg-secondary);
+}
 .results-header h3 {
     margin: 0;
 }
