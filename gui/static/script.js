@@ -62,6 +62,8 @@ function setupBackendToggle() {
     const backendSelect = document.getElementById('backend');
     const chromaConfig = document.getElementById('chroma-config');
     
+    if (!backendSelect) return;
+
     backendSelect.addEventListener('change', () => {
         if (backendSelect.value === 'chroma') {
             chromaConfig.style.display = 'block';
@@ -77,7 +79,6 @@ function setupConfigSummary() {
 
     const codebaseInput = document.getElementById('codebase-path');
     const languageSelect = document.getElementById('language');
-    const backendSelect = document.getElementById('backend');
 
     if (codebaseInput) {
         codebaseInput.addEventListener('input', updateConfigSummary);
@@ -86,34 +87,6 @@ function setupConfigSummary() {
     if (languageSelect) {
         languageSelect.addEventListener('change', updateConfigSummary);
     }
-    if (backendSelect) {
-        backendSelect.addEventListener('change', updateConfigSummary);
-    }
-}
-
-function openTab(evt, tabName) {
-    const tabContents = document.getElementsByClassName('tab-content');
-    for (let content of tabContents) {
-        content.classList.remove('active');
-    }
-    
-    const tabButtons = document.getElementsByClassName('tab-button');
-    for (let button of tabButtons) {
-        button.classList.remove('active');
-    }
-    
-    document.getElementById(tabName).classList.add('active');
-    evt.currentTarget.classList.add('active');
-}
-
-function getConfig() {
-    return {
-        codebase_path: document.getElementById('codebase-path').value,
-        language: document.getElementById('language').value,
-        backend: document.getElementById('backend').value,
-        project_schema: document.getElementById('project-schema').value,
-        chroma_dir: document.getElementById('chroma-dir').value
-    };
 }
 
 function updateConfigSummary() {
@@ -155,6 +128,31 @@ function formatPathLabel(path) {
         return `${parts[0]}/…/${parts[parts.length - 1]}`;
     }
     return trimmed.slice(0, 25) + '…';
+}
+
+function openTab(evt, tabName) {
+    const tabContents = document.getElementsByClassName('tab-content');
+    for (let content of tabContents) {
+        content.classList.remove('active');
+    }
+    
+    const tabButtons = document.getElementsByClassName('tab-button');
+    for (let button of tabButtons) {
+        button.classList.remove('active');
+    }
+    
+    document.getElementById(tabName).classList.add('active');
+    evt.currentTarget.classList.add('active');
+}
+
+function getConfig() {
+    return {
+        codebase_path: document.getElementById('codebase-path').value,
+        language: document.getElementById('language').value,
+        backend: document.getElementById('backend').value,
+        project_schema: document.getElementById('project-schema').value,
+        chroma_dir: document.getElementById('chroma-dir').value
+    };
 }
 
 function showLoading(message = 'Processing request...') {
@@ -279,8 +277,8 @@ function showResults(data) {
         if (sevRow) sevRow.style.display = 'none';
     }
     
-    // Only auto-focus results when we have real analysis output, not simple selection confirmations
-    if (data.results || (!data.success && data.error)) {
+    const shouldScroll = Boolean(data.results) || (!data.success && (data.error || data.stderr));
+    if (shouldScroll) {
         resultsPanel.scrollIntoView({ behavior: 'smooth' });
     }
 }
@@ -963,10 +961,6 @@ let browserTargetInput = 'codebase-path';
 let selectedItemPath = '';
 let selectedItemIsDirectory = true;
 
-function openFolderBrowser() {
-    openPathBrowser('folder', 'codebase-path');
-}
-
 function openFileBrowser() {
     openPathBrowser('file', 'file-path');
 }
@@ -1215,7 +1209,6 @@ function selectCurrentFolder() {
         targetInput.value = currentBrowsePath;
     }
 
-    // Ensure downstream UI (like the config summary strip) stays in sync
     try {
         targetInput.dispatchEvent(new Event('input', { bubbles: true }));
     } catch (_) {
@@ -1847,7 +1840,7 @@ function showFieldError(field, message) {
 }
 
 
-// Dark mode and theme functionality
+// Dark mode enforcement
 function loadTheme() {
     document.documentElement.setAttribute('data-theme', 'dark');
     try {
@@ -1857,7 +1850,6 @@ function loadTheme() {
     }
 }
 
-// Listen for system theme changes and enforce dark mode
 const themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 if (themeMediaQuery) {
     if (themeMediaQuery.addEventListener) {

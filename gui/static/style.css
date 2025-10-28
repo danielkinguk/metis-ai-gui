@@ -80,10 +80,10 @@ body {
     min-height: 100vh;
 }
 
-header {
+.page-header {
     background: linear-gradient(135deg, var(--primary-color) 0%, #6366f1 50%, #8b5cf6 100%);
     color: white;
-    padding: 32px;
+    padding: 28px 28px 12px 28px;
     border-radius: var(--radius-xl);
     margin-bottom: 32px;
     box-shadow: var(--shadow-xl);
@@ -91,11 +91,23 @@ header {
     overflow: hidden;
 }
 
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.05"/><circle cx="10" cy="60" r="0.5" fill="white" opacity="0.05"/><circle cx="90" cy="40" r="0.5" fill="white" opacity="0.05"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+    opacity: 0.3;
+    pointer-events: none;
+}
+
 .header-top {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
     justify-content: space-between;
+    align-items: flex-start;
     gap: 20px;
     position: relative;
     z-index: 1;
@@ -103,33 +115,38 @@ header {
 
 .brand {
     display: flex;
-    align-items: center;
-    gap: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    flex: 1 1 auto;
 }
 
-.brand-logo {
-    display: grid;
-    place-items: center;
-    width: 56px;
-    height: 56px;
-    font-size: 2rem;
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 18px;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+.brand-logo-img {
+    height: 92px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.25));
 }
 
-.brand-copy h1 {
-    margin-bottom: 6px;
-}
-
-.header-actions {
+.brand-copy {
     display: flex;
-    align-items: center;
-    gap: 16px;
+    flex-direction: column;
+    gap: 0;
+    margin-top: auto;
+}
+
+.subtitle {
+    opacity: 0.95;
+    font-size: 1.125rem;
+    font-weight: 400;
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    line-height: 1.2;
 }
 
 .header-description {
-    margin-top: 18px;
+    margin: 0;
     max-width: 680px;
     color: rgba(255, 255, 255, 0.9);
     font-size: 0.95rem;
@@ -138,35 +155,61 @@ header {
     z-index: 1;
 }
 
-.btn-icon {
-    display: inline-flex;
+.header-actions,
+.header-actions-top {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: none;
+    gap: 16px;
+    flex: 0 0 auto;
+}
+
+.header-actions-top {
+    margin-left: auto;
+    align-self: flex-start;
+}
+
+.status {
+    margin-top: 0;
+    padding: 16px 20px;
     background: rgba(255, 255, 255, 0.16);
-    color: white;
-    font-size: 1.1rem;
-    cursor: pointer;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-width: 220px;
+    position: relative;
+    z-index: 1;
     transition: var(--transition);
 }
 
-.btn-icon:hover {
-    background: rgba(255, 255, 255, 0.26);
+.status:hover {
+    background: rgba(255, 255, 255, 0.24);
     transform: translateY(-1px);
 }
 
-.btn-icon:active {
-    transform: scale(0.96);
+.status-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    gap: 12px;
+}
+
+.status-config-btn {
+    align-self: stretch;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .summary-strip {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
-    margin-bottom: 32px;
+    margin: 24px 0 32px 0;
 }
 
 .summary-card {
@@ -212,72 +255,6 @@ header {
 
 [data-theme="dark"] .summary-card::after {
     background: linear-gradient(135deg, rgba(96, 165, 250, 0.12), rgba(34, 211, 238, 0.12));
-}
-
-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.05"/><circle cx="10" cy="60" r="0.5" fill="white" opacity="0.05"/><circle cx="90" cy="40" r="0.5" fill="white" opacity="0.05"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-    opacity: 0.3;
-    pointer-events: none;
-}
-
-h1 {
-    font-size: 2.75rem;
-    font-weight: 700;
-    margin-bottom: 12px;
-    letter-spacing: -0.025em;
-    position: relative;
-    z-index: 1;
-}
-
-.subtitle {
-    opacity: 0.95;
-    font-size: 1.125rem;
-    font-weight: 400;
-    position: relative;
-    z-index: 1;
-}
-
-.status {
-    margin-top: 0;
-    padding: 16px 20px;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: var(--radius-lg);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    position: relative;
-    z-index: 1;
-    transition: var(--transition);
-    min-width: 220px;
-}
-
-.status-info {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    gap: 12px;
-}
-
-.status-config-btn {
-    align-self: stretch;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.status:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-1px);
 }
 
 .status-dot {

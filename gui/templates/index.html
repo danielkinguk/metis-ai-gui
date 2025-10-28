@@ -14,13 +14,19 @@
       <header class="page-header">
         <div class="header-top">
           <div class="brand">
-            <span class="brand-logo">🛡️</span>
+            <img
+              src="https://raw.githubusercontent.com/danielkinguk/metis-ai-gui/refs/heads/main/.github/logo-light.png"
+              alt="Metis AI logo"
+              class="brand-logo-img"
+            />
             <div class="brand-copy">
-              <h1>Metis Security Code Review</h1>
               <p class="subtitle">AI-Powered Security Analysis Platform</p>
+              <p class="header-description">
+                Metis blends retrieval-augmented intelligence with language models to accelerate secure code reviews. Configure your workspace below and launch deep analysis in a few clicks.
+              </p>
             </div>
           </div>
-          <div class="header-actions">
+          <div class="header-actions header-actions-top">
             <div id="status-indicator" class="status">
               <div class="status-info">
                 <span class="status-dot"></span>
@@ -32,25 +38,7 @@
             </div>
           </div>
         </div>
-        <p class="header-description">
-          Metis blends retrieval-augmented intelligence with language models to accelerate secure code reviews. Configure your workspace below and launch deep analysis in a few clicks.
-        </p>
       </header>
-
-      <section class="summary-strip" aria-label="Current configuration">
-        <div class="summary-card">
-          <span class="summary-label">Codebase</span>
-          <span class="summary-value" id="summary-codebase">–</span>
-        </div>
-        <div class="summary-card">
-          <span class="summary-label">Language</span>
-          <span class="summary-value" id="summary-language">–</span>
-        </div>
-        <div class="summary-card">
-          <span class="summary-label">Backend</span>
-          <span class="summary-value" id="summary-backend">–</span>
-        </div>
-      </section>
 
       <div class="config-panel">
         <h3>Configuration</h3>
@@ -104,6 +92,21 @@
           </div>
         </div>
       </div>
+
+      <section class="summary-strip" aria-label="Current configuration">
+        <div class="summary-card">
+          <span class="summary-label">Codebase</span>
+          <span class="summary-value" id="summary-codebase">–</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Language</span>
+          <span class="summary-value" id="summary-language">–</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Backend</span>
+          <span class="summary-value" id="summary-backend">–</span>
+        </div>
+      </section>
 
       <div class="config-panel">
         <h3>Analysis Operations</h3>

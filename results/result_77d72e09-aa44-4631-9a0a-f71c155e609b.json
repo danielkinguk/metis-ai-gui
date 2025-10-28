@@ -1,0 +1,60 @@
+{
+    "reviews": [
+        {
+            "file": "pw_gen.py",
+            "file_path": "/project/workspace/examples/pw_gen.py",
+            "reviews": [
+                {
+                    "issue": "Use of non-cryptographically secure random generator for password creation",
+                    "code_snippet": "import random\n...\npassword = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The code uses the standard library random module (random.choice) to select characters for passwords. The random module is designed for simulations and general-purpose use and is not cryptographically secure; its outputs are predictable if the PRNG state is known or can be inferred. Generating secrets (passwords) with a non-cryptographic PRNG can allow attackers to predict or brute-force generated passwords, especially if an attacker can observe or infer the PRNG seed or outputs.",
+                    "mitigation": "Use the secrets module (e.g., secrets.choice, secrets.token_urlsafe, or secrets.token_bytes) which is designed for generating cryptographically strong random numbers for managing secrets. Example change: replace random.choice(...) with secrets.choice(...), or generate bytes with secrets.token_urlsafe and truncate/transform as needed. Ensure any random-related imports and calls are updated accordingly.",
+                    "confidence": 0.99,
+                    "cwe": "CWE-330",
+                    "severity": "High",
+                    "line_number": 14
+                },
+                {
+                    "issue": "Generated password is printed to standard output (information exposure)",
+                    "code_snippet": "password = generate_password(10)\nprint(password)",
+                    "reasoning": "The example code prints the generated password to stdout. Printing secrets to standard output can cause them to be captured in logs, terminal history, CI job logs, or other monitoring systems, leading to unintended exposure of credentials. This is particularly risky in shared or production environments.",
+                    "mitigation": "Avoid printing secrets. Return the password to the caller and let the caller decide how to handle it securely. If this is for interactive use, present secrets through secure UI or clipboard managers that do not persist to logs. If storing or transporting the password, use secure storage (e.g., a secrets manager) and ensure logging is disabled or redacted.",
+                    "confidence": 0.95,
+                    "cwe": "CWE-200",
+                    "severity": "Medium",
+                    "line_number": 19
+                },
+                {
+                    "issue": "No validation of length parameter (type or bounds) allows unexpected inputs and potential resource exhaustion",
+                    "code_snippet": "def generate_password(length):\n    ...\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The function assumes length is a non-negative integer. If length is negative, non-integer, or extremely large, the generator expression may raise an exception (TypeError for non-integer) or attempt to allocate a very large string, causing high memory usage or denial-of-service. Lack of input validation can lead to crashes or resource exhaustion if callers pass unexpected values.",
+                    "mitigation": "Validate the length parameter: ensure it is an integer within reasonable bounds (e.g., min 1, max a sane upper limit like 1024 or an app-specific limit). Raise a clear exception for invalid inputs. Example: if not isinstance(length, int) or length <= 0 or length > MAX_LENGTH: raise ValueError(...).",
+                    "confidence": 0.8,
+                    "cwe": "CWE-20",
+                    "severity": "Medium",
+                    "line_number": 1
+                },
+                {
+                    "issue": "No guarantee that generated password contains characters from each required class (letters, digits, punctuation)",
+                    "code_snippet": "all_chars = string.ascii_letters + string.digits + string.punctuation\n\n# Generate a password using a random selection of characters\npassword = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The password is built by sampling uniformly from the combined character set. This does not enforce at least one character from each category (uppercase, lowercase, digits, punctuation). If a system or policy requires passwords to include characters from multiple classes, this implementation can produce passwords that fail policy or have weaker entropy distribution than intended.",
+                    "mitigation": "If password policies require category inclusion, enforce them by selecting at least one character from each required class and then filling the rest randomly from the allowed set, shuffling the result. Alternatively, perform policy validation post-generation and regenerate until the policy is satisfied (with a limit on attempts).",
+                    "confidence": 0.88,
+                    "cwe": "CWE-521",
+                    "severity": "Medium",
+                    "line_number": 11
+                },
+                {
+                    "issue": "Use of string.punctuation may produce characters that break downstream usage or require escaping",
+                    "code_snippet": "all_chars = string.ascii_letters + string.digits + string.punctuation",
+                    "reasoning": "string.punctuation contains characters such as quotes, backslashes, dollar signs, and other special characters. If generated passwords are later embedded in shell commands, configuration files, URLs, or markup without proper escaping/encoding, those characters can lead to injection or parsing issues in downstream systems. While the code by itself does not perform dangerous operations, the inclusion of all punctuation without consideration can create downstream risks when the password is used.",
+                    "mitigation": "Decide on an allowed character set appropriate for your usage context. If the password will be used in contexts that are sensitive to special characters, either restrict the punctuation set to safe characters or ensure that any use of the password properly escapes or encodes it before insertion into commands, files, or protocols. Document the character set expected by consumers.",
+                    "confidence": 0.72,
+                    "cwe": "CWE-116",
+                    "severity": "Medium",
+                    "line_number": 11
+                }
+            ]
+        }
+    ]
+}
