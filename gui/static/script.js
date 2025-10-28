@@ -8,6 +8,7 @@ window.addEventListener('DOMContentLoaded', () => {
     checkStatus();
     setupFileInputs();
     setupBackendToggle();
+    setupConfigSummary();
     loadStoredConfig();
     setupKeyboardShortcuts();
     setupAccessibility();
@@ -67,7 +68,27 @@ function setupBackendToggle() {
         } else {
             chromaConfig.style.display = 'none';
         }
+        updateConfigSummary();
     });
+}
+
+function setupConfigSummary() {
+    updateConfigSummary();
+
+    const codebaseInput = document.getElementById('codebase-path');
+    const languageSelect = document.getElementById('language');
+    const backendSelect = document.getElementById('backend');
+
+    if (codebaseInput) {
+        codebaseInput.addEventListener('input', updateConfigSummary);
+        codebaseInput.addEventListener('blur', updateConfigSummary);
+    }
+    if (languageSelect) {
+        languageSelect.addEventListener('change', updateConfigSummary);
+    }
+    if (backendSelect) {
+        backendSelect.addEventListener('change', updateConfigSummary);
+    }
 }
 
 function openTab(evt, tabName) {
@@ -93,6 +114,47 @@ function getConfig() {
         project_schema: document.getElementById('project-schema').value,
         chroma_dir: document.getElementById('chroma-dir').value
     };
+}
+
+function updateConfigSummary() {
+    const codebaseSummary = document.getElementById('summary-codebase');
+    const languageSummary = document.getElementById('summary-language');
+    const backendSummary = document.getElementById('summary-backend');
+
+    if (!codebaseSummary || !languageSummary || !backendSummary) {
+        return;
+    }
+
+    const codebaseInput = document.getElementById('codebase-path');
+    const languageSelect = document.getElementById('language');
+    const backendSelect = document.getElementById('backend');
+
+    const codebaseValue = codebaseInput?.value?.trim() || '';
+    codebaseSummary.textContent = formatPathLabel(codebaseValue);
+
+    if (languageSelect) {
+        const label = languageSelect.options[languageSelect.selectedIndex]?.text || languageSelect.value;
+        languageSummary.textContent = label || 'Not set';
+    }
+
+    if (backendSelect) {
+        const label = backendSelect.options[backendSelect.selectedIndex]?.text || backendSelect.value;
+        backendSummary.textContent = label || 'Not set';
+    }
+}
+
+function formatPathLabel(path) {
+    if (!path) return 'Not set';
+    const trimmed = path.trim();
+    if (!trimmed) return 'Not set';
+    if (trimmed === '.') return 'Current directory';
+    if (trimmed.length <= 28) return trimmed;
+
+    const parts = trimmed.split(/[/\\]+/).filter(Boolean);
+    if (parts.length >= 3) {
+        return `${parts[0]}/…/${parts[parts.length - 1]}`;
+    }
+    return trimmed.slice(0, 25) + '…';
 }
 
 function showLoading(message = 'Processing request...') {
@@ -217,7 +279,10 @@ function showResults(data) {
         if (sevRow) sevRow.style.display = 'none';
     }
     
-    resultsPanel.scrollIntoView({ behavior: 'smooth' });
+    // Only auto-focus results when we have real analysis output, not simple selection confirmations
+    if (data.results || (!data.success && data.error)) {
+        resultsPanel.scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 function formatResults(results) {
@@ -1146,13 +1211,24 @@ function selectCurrentFolder() {
             return;
         }
         targetInput.value = selectedItemPath;
+    } else {
+        targetInput.value = currentBrowsePath;
+    }
+
+    // Ensure downstream UI (like the config summary strip) stays in sync
+    try {
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (_) {
+        updateConfigSummary();
+    }
+
+    if (browserMode === 'file') {
         closeFolderBrowser();
         showResults({
             success: true,
             stdout: `Selected file: ${selectedItemPath}\n\nYou can now review this file.`
         });
     } else {
-        targetInput.value = currentBrowsePath;
         closeFolderBrowser();
         showResults({
             success: true,
@@ -1772,37 +1848,21 @@ function showFieldError(field, message) {
 
 
 // Dark mode and theme functionality
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('metis-theme', newTheme);
-    
-    // Update theme toggle button
-    const themeToggle = document.getElementById('theme-toggle');
-    themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-    themeToggle.title = newTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
-}
-
 function loadTheme() {
-    const savedTheme = localStorage.getItem('metis-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = savedTheme || (prefersDark ? 'dark' : 'light');
-    
-    document.documentElement.setAttribute('data-theme', theme);
-    
-    // Update theme toggle button
-    const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) {
-        themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
-        themeToggle.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+    document.documentElement.setAttribute('data-theme', 'dark');
+    try {
+        localStorage.removeItem('metis-theme');
+    } catch (_) {
+        // ignore storage access issues
     }
 }
 
-// Listen for system theme changes
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    if (!localStorage.getItem('metis-theme')) {
-        loadTheme();
+// Listen for system theme changes and enforce dark mode
+const themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+if (themeMediaQuery) {
+    if (themeMediaQuery.addEventListener) {
+        themeMediaQuery.addEventListener('change', loadTheme);
+    } else if (themeMediaQuery.addListener) {
+        themeMediaQuery.addListener(loadTheme);
     }
-});
+}

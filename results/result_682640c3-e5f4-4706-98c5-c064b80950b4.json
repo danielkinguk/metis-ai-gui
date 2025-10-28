@@ -1,0 +1,50 @@
+{
+    "reviews": [
+        {
+            "file": "pw_gen.py",
+            "file_path": "/project/workspace/examples/pw_gen.py",
+            "reviews": [
+                {
+                    "issue": "Use of non-cryptographically secure PRNG (random) to generate passwords",
+                    "code_snippet": "import random\n...\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The code imports and uses the random module (random.choice) to select characters for a password. The random module is not intended for cryptographic purposes: its output can be predictable if an attacker can learn or guess the internal state or seed. Passwords generated from a non-cryptographic PRNG can be easier to guess or reproduce, reducing their security.",
+                    "mitigation": "Use a cryptographically secure random generator, e.g. the secrets module introduced in Python 3.6. Replace random.choice with secrets.choice (or use secrets.token_urlsafe / secrets.token_bytes and appropriate encoding) to ensure sufficient entropy. Example: password = ''.join(secrets.choice(all_chars) for _ in range(length)).",
+                    "confidence": 0.9,
+                    "cwe": "CWE-327",
+                    "severity": "High",
+                    "line_number": 12
+                },
+                {
+                    "issue": "Program prints generated password to standard output (potential secret leakage)",
+                    "code_snippet": "# Test the function by generating a password of length 10\npassword = generate_password(10)\nprint(password)",
+                    "reasoning": "The generated password is output directly to stdout via print(). Printing secrets to console can expose them to shoulder-surfing, process logs, terminal history, or other monitoring systems. In many environments, stdout may be captured by logging or system services, increasing the risk of secret leakage.",
+                    "mitigation": "Avoid printing secrets. Return the password to the caller and let the caller decide secure handling. If displaying is required, warn the user and ensure the environment is secure (e.g., ephemeral display, not saved to logs). Consider offering secure delivery alternatives (e.g., copy to clipboard using a secure utility, store in an encrypted vault).",
+                    "confidence": 0.9,
+                    "cwe": "CWE-532",
+                    "severity": "Medium",
+                    "line_number": 17
+                },
+                {
+                    "issue": "No validation of 'length' parameter \u2014 risk of uncontrolled resource consumption",
+                    "code_snippet": "def generate_password(length):\n    \"\"\"This function generates a random password\n    of a given length using a combination of\n    uppercase letters, lowercase letters,\n    digits, and special characters\"\"\"\n\n    # Define a string containing all possible characters\n    all_chars = string.ascii_letters + string.digits + string.punctuation\n\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The function accepts length without validation. If a caller passes a very large integer (or a negative value, or a non-integer), the generator expression and join may attempt to allocate very large memory or behave unexpectedly, potentially causing high memory/CPU usage and denial-of-service. Negative or non-integer types will raise exceptions leading to crashes if not handled.",
+                    "mitigation": "Validate the length parameter: enforce an acceptable min/max (e.g., 8 <= length <= 128), check that it's an integer, and raise a clear exception for invalid inputs. Also consider rate-limiting or other controls if the function is invoked in servable interfaces.",
+                    "confidence": 0.8,
+                    "cwe": "CWE-400",
+                    "severity": "Medium",
+                    "line_number": 1
+                },
+                {
+                    "issue": "No input type checking \u2014 possible crashes or unexpected behavior for non-integer length",
+                    "code_snippet": "def generate_password(length):\n    \"\"\"This function generates a random password\n    of a given length using a combination of\n    uppercase letters, lowercase letters,\n    digits, and special characters\"\"\"\n\n    # Define a string containing all possible characters\n    all_chars = string.ascii_letters + string.digits + string.punctuation\n\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "If length is not an integer (e.g., a float, None, or a string), range(length) will raise a TypeError. Unvalidated inputs can cause the application to raise unhandled exceptions that may lead to crashes or denials of service. While not directly a confidentiality issue, input validation is a common root cause of security failures.",
+                    "mitigation": "Validate and coerce input types explicitly. For example, check isinstance(length, int) and raise a ValueError for invalid types. If coercion is needed, perform explicit and safe conversion with bounds checking.",
+                    "confidence": 0.7,
+                    "cwe": "CWE-20",
+                    "severity": "Low",
+                    "line_number": 1
+                }
+            ]
+        }
+    ]
+}

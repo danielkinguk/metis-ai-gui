@@ -1,0 +1,50 @@
+{
+    "reviews": [
+        {
+            "file": "pw_gen.py",
+            "file_path": "/project/workspace/examples/pw_gen.py",
+            "reviews": [
+                {
+                    "issue": "Use of non-cryptographic PRNG (Mersenne Twister) to generate passwords",
+                    "code_snippet": "import random\n...\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The code uses the 'random' module (Mersenne Twister) to select characters for a password. The Python 'random' module is not suitable for generating cryptographic secrets because its outputs are predictable if the internal state is observed or partially known. Using a non-cryptographic PRNG to produce passwords can make generated passwords guessable or recoverable by an attacker, undermining the secrecy of the password.",
+                    "mitigation": "Use a cryptographically secure source of randomness, for example the 'secrets' module in Python 3 (secrets.choice, secrets.token_bytes, secrets.token_urlsafe, etc.). Example: password = ''.join(secrets.choice(all_chars) for _ in range(length)). Ensure all code paths that generate secrets use a CSPRNG.",
+                    "confidence": 0.95,
+                    "cwe": "CWE-330",
+                    "severity": "High",
+                    "line_number": 12
+                },
+                {
+                    "issue": "Printing generated password to stdout (potential secret leakage)",
+                    "code_snippet": "# Test the function by generating a password of length 10\npassword = generate_password(10)\nprint(password)",
+                    "reasoning": "The script prints the generated password directly to standard output. In many environments stdout is captured in logs, terminal histories, CI job artifacts, or monitoring systems. Emitting secrets to such outputs increases the risk of accidental exposure or leakage to unauthorized parties.",
+                    "mitigation": "Avoid printing secrets in production code. Return the password to the caller and let the caller handle it securely. If a user-facing display is required, show it in a secure UI or copy to clipboard, and ensure any logging or stdout is disabled or masked. Remove or protect ad-hoc test prints before deployment.",
+                    "confidence": 0.9,
+                    "cwe": "CWE-532",
+                    "severity": "Medium",
+                    "line_number": 17
+                },
+                {
+                    "issue": "No enforcement of password composition requirements (weak/insufficient password policy)",
+                    "code_snippet": "    # Define a string containing all possible characters\n    all_chars = string.ascii_letters + string.digits + string.punctuation\n\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The generator chooses each character randomly from the full set but does not enforce that the final password contains at least one uppercase, one lowercase, one digit, and one special character. Especially with short lengths (e.g., length=4..8) this can frequently produce passwords that do not meet common complexity policies. A password generator intended for adoption should ensure compliance with policy requirements rather than relying on chance.",
+                    "mitigation": "Enforce composition rules in the generator: require a configurable minimum length and ensure inclusion of required character classes by explicitly selecting at least one character from each required class and then filling the remainder randomly (using a CSPRNG). Validate the final password against policy and regenerate if it does not comply.",
+                    "confidence": 0.85,
+                    "cwe": "CWE-521",
+                    "severity": "Medium",
+                    "line_number": 9
+                },
+                {
+                    "issue": "No input validation on 'length' parameter leading to potential resource exhaustion",
+                    "code_snippet": "def generate_password(length):\n    \"\"\"This function generates a random password\n    of a given length using a combination of\n    uppercase letters, lowercase letters,\n    digits, and special characters\"\"\"\n\n    # Define a string containing all possible characters\n    all_chars = string.ascii_letters + string.digits + string.punctuation\n\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The function accepts an unbounded 'length' parameter and uses it to allocate and join that many characters. If an attacker or misbehaving caller supplies a very large length (or a non-integer that coerces unexpectedly), the function can allocate excessive memory or CPU time, resulting in denial of service or application instability.",
+                    "mitigation": "Validate and bound the 'length' parameter: ensure it is an integer within a reasonable range (e.g., minimum length >= 8, maximum length <= configured cap such as 1024). Handle invalid input types explicitly by raising a clear exception. Consider failing gracefully rather than attempting large allocations.",
+                    "confidence": 0.8,
+                    "cwe": "CWE-400",
+                    "severity": "Medium",
+                    "line_number": 1
+                }
+            ]
+        }
+    ]
+}

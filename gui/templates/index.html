@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,17 +11,46 @@
   </head>
   <body>
     <div class="container">
-      <header>
-        <h1>🛡️ Metis Security Code Review</h1>
-        <p class="subtitle">AI-Powered Security Analysis Tool</p>
-        <div id="status-indicator" class="status">
-          <span class="status-dot"></span>
-          <span class="status-text">Checking configuration...</span>
-          <button class="btn btn-small btn-config" onclick="openConfigModal()">
-            ⚙️ Configure API
-          </button>
+      <header class="page-header">
+        <div class="header-top">
+          <div class="brand">
+            <span class="brand-logo">🛡️</span>
+            <div class="brand-copy">
+              <h1>Metis Security Code Review</h1>
+              <p class="subtitle">AI-Powered Security Analysis Platform</p>
+            </div>
+          </div>
+          <div class="header-actions">
+            <div id="status-indicator" class="status">
+              <div class="status-info">
+                <span class="status-dot"></span>
+                <span class="status-text">Checking configuration...</span>
+              </div>
+              <button class="btn btn-secondary status-config-btn" onclick="openConfigModal()">
+                ⚙️ Configure API
+              </button>
+            </div>
+          </div>
         </div>
+        <p class="header-description">
+          Metis blends retrieval-augmented intelligence with language models to accelerate secure code reviews. Configure your workspace below and launch deep analysis in a few clicks.
+        </p>
       </header>
+
+      <section class="summary-strip" aria-label="Current configuration">
+        <div class="summary-card">
+          <span class="summary-label">Codebase</span>
+          <span class="summary-value" id="summary-codebase">–</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Language</span>
+          <span class="summary-value" id="summary-language">–</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Backend</span>
+          <span class="summary-value" id="summary-backend">–</span>
+        </div>
+      </section>
 
       <div class="config-panel">
         <h3>Configuration</h3>
