@@ -13,6 +13,7 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import uuid
 from dotenv import load_dotenv, set_key, unset_key
+import sys
 import re
 
 app = Flask(__name__)
@@ -21,6 +22,14 @@ CORS(app)
 
 # .env file location (in project root)
 ENV_FILE = Path(__file__).parent.parent / '.env'
+
+# Default folder for the Browse dialog
+DEFAULT_BROWSE_START = Path(
+    os.environ.get(
+        "METIS_DEFAULT_PATH",
+        Path(__file__).resolve().parents[1] / "examples",
+    )
+).resolve()
 
 # Load existing .env file
 if ENV_FILE.exists():
@@ -107,8 +116,9 @@ def run_metis_command(command, args=None):
     # Apply API keys before running command
     apply_api_keys()
     
-    cmd = ['python3', '-m', 'metis', '--non-interactive', '--quiet']
-    
+    cmd = [sys.executable, '-m', 'metis', '--non-interactive', '--verbose']
+    os.environ['LLAMA_INDEX_LOG_LEVEL'] = 'DEBUG'
+
     if args:
         for key, value in args.items():
             if value is not None and value != '':
@@ -446,13 +456,13 @@ def delete_config():
 @app.route('/api/browse', methods=['GET'])
 def browse_directories():
     """Browse directories for folder selection."""
-    current_path = request.args.get('path', str(Path.home()))
+    current_path = request.args.get('path', str(DEFAULT_BROWSE_START))
     
     try:
         # Ensure the path exists and is a directory
         path_obj = Path(current_path).resolve()
         if not path_obj.exists() or not path_obj.is_dir():
-            path_obj = Path.home()
+            path_obj = DEFAULT_BROWSE_START
         
         # Get parent directory info
         parent = str(path_obj.parent) if path_obj.parent != path_obj else None

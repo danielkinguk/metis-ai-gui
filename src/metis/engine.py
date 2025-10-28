@@ -200,8 +200,10 @@ class MetisEngine:
         )
         logger.info("Documentation indexing complete.")
 
-    def review_file(self, file_path, validate=False):
-        query_engine_code, query_engine_docs = self._init_and_get_query_engines()
+    def review_file(self, file_path, validate=False, include_related_context=True):
+        query_engine_code = query_engine_docs = None
+        if include_related_context:
+            query_engine_code, query_engine_docs = self._init_and_get_query_engines()
 
         base_path = os.path.abspath(self.codebase_path)
         snippet = read_file_content(file_path)
@@ -214,9 +216,16 @@ class MetisEngine:
         ).get("retrieve_context", "")
         formatted_context_prompt = context_prompt_template.format(file_path=file_path)
 
-        combined_context = self._retrieve_context(
-            file_path, query_engine_code, query_engine_docs, formatted_context_prompt
+        combined_context = (
+            "No additional context provided; focus solely on the supplied file."
         )
+        if include_related_context and query_engine_code and query_engine_docs:
+            combined_context = self._retrieve_context(
+                file_path,
+                query_engine_code,
+                query_engine_docs,
+                formatted_context_prompt,
+            )
         relative_path = os.path.relpath(file_path, base_path)
 
         try:

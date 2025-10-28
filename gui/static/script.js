@@ -850,12 +850,69 @@ window.onclick = function(event) {
 
 // Folder Browser Functions
 let currentBrowsePath = '';
+let browserMode = 'folder';
+let browserTargetInput = 'codebase-path';
+let selectedItemPath = '';
+let selectedItemIsDirectory = true;
 
 function openFolderBrowser() {
-    document.getElementById('folder-browser-modal').style.display = 'flex';
-    // Start with current codebase path or home directory
-    const currentPath = document.getElementById('codebase-path').value || '.';
-    loadDirectory(currentPath);
+    openPathBrowser('folder', 'codebase-path');
+}
+
+function openFileBrowser() {
+    openPathBrowser('file', 'file-path');
+}
+
+function openPathBrowser(mode, targetInputId) {
+    browserMode = mode;
+    browserTargetInput = targetInputId;
+    selectedItemPath = '';
+    selectedItemIsDirectory = mode === 'folder';
+
+    const modal = document.getElementById('folder-browser-modal');
+    modal.style.display = 'flex';
+
+    const selectBtn = document.getElementById('select-btn');
+    selectBtn.textContent = mode === 'folder' ? 'Select This Folder' : 'Select This File';
+    selectBtn.disabled = mode === 'file';
+
+    const titleEl = document.querySelector('#folder-browser-modal .modal-header h2');
+    if (titleEl) {
+        titleEl.textContent = mode === 'folder' ? '📁 Select Code Folder' : '📄 Select File';
+    }
+
+    const startInput = document.getElementById(targetInputId);
+    const fallbackPath = document.getElementById('codebase-path')?.value || '.';
+    const rawPath = startInput?.value?.trim() || fallbackPath;
+    const startPath = mode === 'file' && rawPath ? rawPath.replace(/\\/g, '/') : rawPath;
+
+    loadDirectory(resolveStartDirectory(startPath, mode));
+
+    setTimeout(() => {
+        const firstButton = document.querySelector('#folder-browser-modal .btn');
+        if (firstButton) {
+            firstButton.focus();
+        }
+    }, 100);
+}
+
+function resolveStartDirectory(path, mode) {
+    if (!path) {
+        return '.';
+    }
+
+    if (mode === 'file') {
+        if (path.endsWith('/')) {
+            return path;
+        }
+        const lastSlash = path.lastIndexOf('/');
+        if (lastSlash > 0) {
+            return path.slice(0, lastSlash);
+        }
+        return '.';
+    }
+
+    return path;
 }
 
 function closeFolderBrowser() {
@@ -865,6 +922,14 @@ function closeFolderBrowser() {
 async function loadDirectory(path) {
     const content = document.getElementById('browser-content');
     content.innerHTML = '<div class="loading-spinner">Loading directories...</div>';
+    if (browserMode === 'file') {
+        selectedItemPath = '';
+        selectedItemIsDirectory = false;
+        const selectBtn = document.getElementById('select-btn');
+        if (selectBtn) {
+            selectBtn.disabled = true;
+        }
+    }
     
     try {
         const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
@@ -885,14 +950,24 @@ async function loadDirectory(path) {
 function updateBrowserDisplay(data) {
     // Update current path display
     document.getElementById('current-path').textContent = data.current_path;
-    document.getElementById('selected-path').textContent = data.current_path;
     
-    // Enable/disable parent button
     const parentBtn = document.getElementById('parent-btn');
     parentBtn.disabled = !data.parent_path;
-    
-    // Enable select button
-    document.getElementById('select-btn').disabled = false;
+
+    if (browserMode === 'folder') {
+        selectedItemPath = data.current_path;
+        selectedItemIsDirectory = true;
+        document.getElementById('selected-path').textContent = selectedItemPath;
+        document.getElementById('select-btn').disabled = false;
+    } else {
+        // Preserve selection only if it belongs to current directory tree
+        if (!selectedItemPath.startsWith(data.current_path)) {
+            selectedItemPath = '';
+        }
+        selectedItemIsDirectory = false;
+        document.getElementById('selected-path').textContent = selectedItemPath || 'Select a file';
+        document.getElementById('select-btn').disabled = !selectedItemPath;
+    }
     
     // Render directory contents
     const content = document.getElementById('browser-content');
@@ -969,14 +1044,26 @@ function updateBrowserDisplay(data) {
 
     // Add click event listeners to all browser items
     content.querySelectorAll('.browser-item').forEach(itemEl => {
-        itemEl.addEventListener('click', () => {
-            const path = itemEl.getAttribute('data-path');
-            const name = itemEl.getAttribute('data-name');
-            const isDirectory = itemEl.getAttribute('data-is-directory') === 'true';
+        const path = itemEl.getAttribute('data-path');
+        const name = itemEl.getAttribute('data-name');
+        const isDirectory = itemEl.getAttribute('data-is-directory') === 'true';
 
+        if (!isDirectory && browserMode === 'file' && path === selectedItemPath) {
+            itemEl.classList.add('selected');
+        }
+
+        itemEl.addEventListener('click', () => {
             if (isDirectory) {
                 loadDirectory(path);
             } else {
+                if (browserMode === 'file') {
+                    selectedItemPath = path;
+                    selectedItemIsDirectory = false;
+                    document.getElementById('selected-path').textContent = selectedItemPath;
+                    document.getElementById('select-btn').disabled = false;
+                    content.querySelectorAll('.browser-item').forEach(el => el.classList.remove('selected'));
+                    itemEl.classList.add('selected');
+                }
                 previewFile(path, name);
             }
         });
@@ -1005,15 +1092,30 @@ function navigateToHome() {
 }
 
 function selectCurrentFolder() {
-    // Set the selected folder as the codebase path
-    document.getElementById('codebase-path').value = currentBrowsePath;
-    closeFolderBrowser();
-    
-    // Show a confirmation message
-    showResults({
-        success: true,
-        stdout: `Selected folder: ${currentBrowsePath}\n\nYou can now proceed with indexing or analysis.`
-    });
+    const targetInput = document.getElementById(browserTargetInput);
+    if (!targetInput) {
+        closeFolderBrowser();
+        return;
+    }
+
+    if (browserMode === 'file') {
+        if (!selectedItemPath || selectedItemIsDirectory) {
+            return;
+        }
+        targetInput.value = selectedItemPath;
+        closeFolderBrowser();
+        showResults({
+            success: true,
+            stdout: `Selected file: ${selectedItemPath}\n\nYou can now review this file.`
+        });
+    } else {
+        targetInput.value = currentBrowsePath;
+        closeFolderBrowser();
+        showResults({
+            success: true,
+            stdout: `Selected folder: ${currentBrowsePath}\n\nYou can now proceed with indexing or analysis.`
+        });
+    }
 }
 
 // Result filtering and search functions
@@ -1244,17 +1346,7 @@ function openConfigModal() {
 }
 
 function openFolderBrowser() {
-    document.getElementById('folder-browser-modal').style.display = 'flex';
-    const currentPath = document.getElementById('codebase-path').value || '.';
-    loadDirectory(currentPath);
-    
-    // Focus first interactive element
-    setTimeout(() => {
-        const firstButton = document.querySelector('#folder-browser-modal .btn');
-        if (firstButton) {
-            firstButton.focus();
-        }
-    }, 100);
+    openPathBrowser('folder', 'codebase-path');
 }
 
 

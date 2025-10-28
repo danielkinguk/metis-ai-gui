@@ -1,252 +1,443 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Metis GUI - AI Security Code Review</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
     <div class="container">
-        <header>
-            <h1>🛡️ Metis Security Code Review</h1>
-            <p class="subtitle">AI-Powered Security Analysis Tool</p>
-            <div id="status-indicator" class="status">
-                <span class="status-dot"></span>
-                <span class="status-text">Checking configuration...</span>
-                <button class="btn btn-small btn-config" onclick="openConfigModal()">⚙️ Configure API</button>
-            </div>
-        </header>
+      <header>
+        <h1>🛡️ Metis Security Code Review</h1>
+        <p class="subtitle">AI-Powered Security Analysis Tool</p>
+        <div id="status-indicator" class="status">
+          <span class="status-dot"></span>
+          <span class="status-text">Checking configuration...</span>
+          <button class="btn btn-small btn-config" onclick="openConfigModal()">
+            ⚙️ Configure API
+          </button>
+        </div>
+      </header>
 
-        <div class="config-panel">
-            <h3>Configuration</h3>
-            <div class="config-grid">
-                <div class="config-item">
-                    <label for="codebase-path">Codebase Path:</label>
-                    <div class="path-input-group">
-                        <input type="text" id="codebase-path" value="." placeholder="Path to your codebase">
-                        <button class="btn btn-small" onclick="openFolderBrowser()">📁 Browse</button>
-                    </div>
-                </div>
-                <div class="config-item">
-                    <label for="language">Language Plugin:</label>
-                    <select id="language">
-                        <option value="c">C/C++</option>
-                        <option value="python">Python</option>
-                        <option value="rust">Rust</option>
-                    </select>
-                </div>
-                <div class="config-item">
-                    <label for="backend">Vector Backend:</label>
-                    <select id="backend">
-                        <option value="chroma">ChromaDB</option>
-                        <option value="postgres">PostgreSQL</option>
-                    </select>
-                </div>
-                <div class="config-item">
-                    <label for="project-schema">Project Schema:</label>
-                    <input type="text" id="project-schema" value="myproject-main" placeholder="Schema name">
-                </div>
-                <div class="config-item" id="chroma-config">
-                    <label for="chroma-dir">ChromaDB Directory:</label>
-                    <input type="text" id="chroma-dir" value="./chromadb" placeholder="ChromaDB storage path">
-                </div>
+      <div class="config-panel">
+        <h3>Configuration</h3>
+        <div class="config-grid">
+          <div class="config-item">
+            <label for="codebase-path">Codebase Path:</label>
+            <div class="path-input-group">
+              <input
+                type="text"
+                id="codebase-path"
+                value="."
+                placeholder="Path to your codebase"
+              />
+              <button class="btn btn-small" onclick="openFolderBrowser()">
+                📁 Browse
+              </button>
             </div>
+          </div>
+          <div class="config-item">
+            <label for="language">Language Plugin:</label>
+            <select id="language">
+              <option value="c">C</option>
+              <option value="cpp">C++</option>
+              <option value="python" selected>Python</option>
+            </select>
+          </div>
+          <div class="config-item">
+            <label for="backend">Vector Backend:</label>
+            <select id="backend">
+              <option value="chroma">ChromaDB</option>
+              <option value="postgres">PostgreSQL</option>
+            </select>
+          </div>
+          <div class="config-item">
+            <label for="project-schema">Project Schema:</label>
+            <input
+              type="text"
+              id="project-schema"
+              value="myproject-main"
+              placeholder="Schema name"
+            />
+          </div>
+          <div class="config-item" id="chroma-config">
+            <label for="chroma-dir">ChromaDB Directory:</label>
+            <input
+              type="text"
+              id="chroma-dir"
+              value="./chromadb"
+              placeholder="ChromaDB storage path"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="config-panel">
+        <h3>Analysis Operations</h3>
+        <div class="tabs">
+          <button
+            class="tab-button active"
+            onclick="openTab(event, 'index-tab')"
+          >
+            Index
+          </button>
+          <button
+            class="tab-button"
+            onclick="openTab(event, 'review-file-tab')"
+          >
+            Review File
+          </button>
+          <button
+            class="tab-button"
+            onclick="openTab(event, 'review-patch-tab')"
+          >
+            Review Patch
+          </button>
+          <button class="tab-button" onclick="openTab(event, 'update-tab')">
+            Update Index
+          </button>
         </div>
 
-        <div class="config-panel">
-            <h3>Analysis Operations</h3>
-            <div class="tabs">
-                <button class="tab-button active" onclick="openTab(event, 'index-tab')">Index</button>
-                <button class="tab-button" onclick="openTab(event, 'review-file-tab')">Review File</button>
-                <button class="tab-button" onclick="openTab(event, 'review-patch-tab')">Review Patch</button>
-                <button class="tab-button" onclick="openTab(event, 'update-tab')">Update Index</button>
-            </div>
-
-            <div id="index-tab" class="tab-content active">
-                <h2>Index Codebase</h2>
-                <p>Build the vector database index for your codebase. This is required before performing reviews or asking questions.</p>
-                <button class="btn btn-primary" onclick="indexCodebase()">Start Indexing</button>
-                <div class="progress-bar" id="index-progress" style="display: none;">
-                    <div class="progress-fill"></div>
-                </div>
-            </div>
-
-            <div id="review-patch-tab" class="tab-content">
-                <h2>Review Patch</h2>
-                <p>Upload a patch file to review for security issues.</p>
-                <div class="file-upload">
-                    <input type="file" id="patch-file" accept=".patch,.diff,.txt">
-                    <label for="patch-file" class="file-label">Choose patch file...</label>
-                    <span id="patch-filename"></span>
-                </div>
-                <button class="btn btn-primary" onclick="reviewPatch()">Review Patch</button>
-            </div>
-
-            <div id="review-file-tab" class="tab-content">
-                <h2>Review File</h2>
-                <p>Review a specific file in your codebase for security issues.</p>
-                <input type="text" id="file-path" placeholder="Enter file path (e.g., src/main.c)">
-                <button class="btn btn-primary" onclick="reviewFile()">Review File</button>
-            </div>
-
-            <div id="update-tab" class="tab-content">
-                <h2>Update Index</h2>
-                <p>Update the vector database index with changes from a patch file.</p>
-                <div class="file-upload">
-                    <input type="file" id="update-patch-file" accept=".patch,.diff,.txt">
-                    <label for="update-patch-file" class="file-label">Choose patch file...</label>
-                    <span id="update-patch-filename"></span>
-                </div>
-                <button class="btn btn-primary" onclick="updateIndex()">Update Index</button>
-            </div>
+        <div id="index-tab" class="tab-content active">
+          <h2>Index Codebase</h2>
+          <p>
+            Build the vector database index for your codebase. This is required
+            before performing reviews or asking questions.
+          </p>
+          <button class="btn btn-primary" onclick="indexCodebase()">
+            Start Indexing
+          </button>
+          <div class="progress-bar" id="index-progress" style="display: none">
+            <div class="progress-fill"></div>
+          </div>
         </div>
 
-        <div class="config-panel">
-            <h3>Security Review</h3>
-            <p style="color: var(--text-secondary); margin-bottom: 20px;">Ask security-related questions about your codebase.</p>
-            <div class="config-item">
-                <label for="question">Your Question:</label>
-                <textarea id="question" rows="4" style="width: 100%; margin-bottom: 15px;">Perform a basic security review of my code.</textarea>
-                <button class="btn btn-primary" onclick="askQuestion()">Ask Question</button>
-            </div>
+        <div id="review-patch-tab" class="tab-content">
+          <h2>Review Patch</h2>
+          <p>Upload a patch file to review for security issues.</p>
+          <div class="file-upload">
+            <input type="file" id="patch-file" accept=".patch,.diff,.txt" />
+            <label for="patch-file" class="file-label"
+              >Choose patch file...</label
+            >
+            <span id="patch-filename"></span>
+          </div>
+          <button class="btn btn-primary" onclick="reviewPatch()">
+            Review Patch
+          </button>
         </div>
 
-        <div class="results-panel" id="results" style="display: none;">
-            <div class="results-header">
-                <h3>Results</h3>
-                <div class="result-actions">
-                    <button class="btn btn-small" onclick="clearResults()">Clear</button>
-                    <button class="btn btn-small" id="download-text-btn" style="display: none;" onclick="downloadResultsAsText()">Download Text</button>
-                    <button class="btn btn-small" id="download-btn" style="display: none;" onclick="downloadResults()">Download JSON</button>
-                </div>
+        <div id="review-file-tab" class="tab-content">
+          <h2>Review File</h2>
+          <p>Review a specific file in your codebase for security issues.</p>
+          <div class="path-input-group">
+            <input
+              type="text"
+              id="file-path"
+              placeholder="Enter file path (e.g., src/main.c)"
+            />
+            <div class="button-group">
+              <button class="btn btn-small" onclick="openFileBrowser()">
+                📁 Browse
+              </button>
+              <button class="btn btn-primary" onclick="reviewFile()">
+                Review File
+              </button>
             </div>
-            <div class="results-controls" id="results-controls" style="display: none;">
-                <div class="search-box">
-                    <input type="text" id="result-search" placeholder="Search results..." onkeyup="filterResults()">
-                    <span class="search-icon">🔍</span>
-                </div>
-                <div class="filter-controls">
-                    <select id="severity-filter" onchange="filterResults()">
-                        <option value="">All Severities</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                    </select>
-                    <button class="btn btn-small" onclick="expandAllIssues()">Expand All</button>
-                    <button class="btn btn-small" onclick="collapseAllIssues()">Collapse All</button>
-                </div>
-            </div>
-            <div class="results-stats" id="results-stats" style="display: none;">
-                <span id="results-count">0 issues found</span>
-                <span id="filtered-count" style="display: none;">0 filtered</span>
-            </div>
-            <div id="result-content"></div>
+          </div>
         </div>
 
-        <div id="loading-overlay" class="loading-overlay" style="display: none;">
-            <div class="spinner"></div>
-            <p>Processing request...</p>
-            <button class="btn btn-danger" onclick="cancelOperation()" style="margin-top: 20px;">Cancel Operation</button>
+        <div id="update-tab" class="tab-content">
+          <h2>Update Index</h2>
+          <p>
+            Update the vector database index with changes from a patch file.
+          </p>
+          <div class="file-upload">
+            <input
+              type="file"
+              id="update-patch-file"
+              accept=".patch,.diff,.txt"
+            />
+            <label for="update-patch-file" class="file-label"
+              >Choose patch file...</label
+            >
+            <span id="update-patch-filename"></span>
+          </div>
+          <button class="btn btn-primary" onclick="updateIndex()">
+            Update Index
+          </button>
         </div>
+      </div>
 
-        <!-- API Configuration Modal -->
-        <div id="config-modal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>API Configuration</h2>
-                    <button class="close-btn" onclick="closeConfigModal()">&times;</button>
+      <div class="config-panel">
+        <h3>Security Review</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 20px">
+          Ask security-related questions about your codebase.
+        </p>
+        <div class="config-item">
+          <label for="question">Your Question:</label>
+          <textarea
+            id="question"
+            rows="4"
+            style="width: 100%; margin-bottom: 15px"
+          >
+Perform a basic security review of my code.</textarea
+          >
+          <button class="btn btn-primary" onclick="askQuestion()">
+            Ask Question
+          </button>
+        </div>
+      </div>
+
+      <div class="results-panel" id="results" style="display: none">
+        <div class="results-header">
+          <h3>Results</h3>
+          <div class="result-actions">
+            <button class="btn btn-small" onclick="clearResults()">
+              Clear
+            </button>
+            <button
+              class="btn btn-small"
+              id="download-text-btn"
+              style="display: none"
+              onclick="downloadResultsAsText()"
+            >
+              Download Text
+            </button>
+            <button
+              class="btn btn-small"
+              id="download-btn"
+              style="display: none"
+              onclick="downloadResults()"
+            >
+              Download JSON
+            </button>
+          </div>
+        </div>
+        <div
+          class="results-controls"
+          id="results-controls"
+          style="display: none"
+        >
+          <div class="search-box">
+            <input
+              type="text"
+              id="result-search"
+              placeholder="Search results..."
+              onkeyup="filterResults()"
+            />
+            <span class="search-icon">🔍</span>
+          </div>
+          <div class="filter-controls">
+            <select id="severity-filter" onchange="filterResults()">
+              <option value="">All Severities</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <button class="btn btn-small" onclick="expandAllIssues()">
+              Expand All
+            </button>
+            <button class="btn btn-small" onclick="collapseAllIssues()">
+              Collapse All
+            </button>
+          </div>
+        </div>
+        <div class="results-stats" id="results-stats" style="display: none">
+          <span id="results-count">0 issues found</span>
+          <span id="filtered-count" style="display: none">0 filtered</span>
+        </div>
+        <div id="result-content"></div>
+      </div>
+
+      <div id="loading-overlay" class="loading-overlay" style="display: none">
+        <div class="spinner"></div>
+        <p>Processing request...</p>
+        <button
+          class="btn btn-danger"
+          onclick="cancelOperation()"
+          style="margin-top: 20px"
+        >
+          Cancel Operation
+        </button>
+      </div>
+
+      <!-- API Configuration Modal -->
+      <div id="config-modal" class="modal" style="display: none">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>API Configuration</h2>
+            <button class="close-btn" onclick="closeConfigModal()">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-description">
+              Configure your API keys for Metis. Keys are stored locally and
+              used for all operations.
+            </p>
+
+            <div class="api-section">
+              <h3>OpenAI Configuration</h3>
+              <div class="config-item">
+                <label for="openai-key">OpenAI API Key:</label>
+                <div class="key-input-group">
+                  <input
+                    type="password"
+                    id="openai-key"
+                    placeholder="sk-..."
+                    autocomplete="off"
+                  />
+                  <button
+                    class="btn btn-small"
+                    onclick="toggleKeyVisibility('openai-key')"
+                  >
+                    👁️
+                  </button>
                 </div>
-                <div class="modal-body">
-                    <p class="modal-description">Configure your API keys for Metis. Keys are stored locally and used for all operations.</p>
-                    
-                    <div class="api-section">
-                        <h3>OpenAI Configuration</h3>
-                        <div class="config-item">
-                            <label for="openai-key">OpenAI API Key:</label>
-                            <div class="key-input-group">
-                                <input type="password" id="openai-key" placeholder="sk-..." autocomplete="off">
-                                <button class="btn btn-small" onclick="toggleKeyVisibility('openai-key')">👁️</button>
-                            </div>
-                            <small>Get your key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a></small>
-                        </div>
-                    </div>
-
-                    <div class="api-section">
-                        <h3>Azure OpenAI Configuration (Optional)</h3>
-                        <div class="config-item">
-                            <label for="azure-key">Azure OpenAI API Key:</label>
-                            <div class="key-input-group">
-                                <input type="password" id="azure-key" placeholder="Your Azure OpenAI key" autocomplete="off">
-                                <button class="btn btn-small" onclick="toggleKeyVisibility('azure-key')">👁️</button>
-                            </div>
-                        </div>
-                        <div class="config-item">
-                            <label for="azure-endpoint">Azure Endpoint:</label>
-                            <input type="text" id="azure-endpoint" placeholder="https://your-resource.openai.azure.com/">
-                        </div>
-                        <div class="config-item">
-                            <label for="azure-deployment">Azure Deployment Name:</label>
-                            <input type="text" id="azure-deployment" placeholder="your-deployment-name">
-                        </div>
-                    </div>
-
-                    <div class="modal-actions">
-                        <button class="btn btn-primary" onclick="saveApiConfigWithValidation()">Save Configuration</button>
-                        <button class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
-                        <button class="btn btn-danger" onclick="clearApiConfig()">Clear All Keys</button>
-                    </div>
-
-                    <div id="config-message" class="config-message" style="display: none;"></div>
-                </div>
+                <small
+                  >Get your key from
+                  <a href="https://platform.openai.com/api-keys" target="_blank"
+                    >OpenAI Platform</a
+                  ></small
+                >
+              </div>
             </div>
-        </div>
 
-        <!-- Folder Browser Modal -->
-        <div id="folder-browser-modal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>📁 Select Code Folder</h2>
-                    <button class="close-btn" onclick="closeFolderBrowser()">&times;</button>
+            <div class="api-section">
+              <h3>Azure OpenAI Configuration (Optional)</h3>
+              <div class="config-item">
+                <label for="azure-key">Azure OpenAI API Key:</label>
+                <div class="key-input-group">
+                  <input
+                    type="password"
+                    id="azure-key"
+                    placeholder="Your Azure OpenAI key"
+                    autocomplete="off"
+                  />
+                  <button
+                    class="btn btn-small"
+                    onclick="toggleKeyVisibility('azure-key')"
+                  >
+                    👁️
+                  </button>
                 </div>
-                <div class="modal-body">
-                    <div class="browser-header">
-                        <div class="path-navigation">
-                            <button class="btn btn-small" onclick="navigateToParent()" id="parent-btn">📁 Up</button>
-                            <button class="btn btn-small" onclick="navigateToHome()">🏠 Home</button>
-                            <span class="current-path" id="current-path">/</span>
-                        </div>
-                    </div>
-                    
-                    <div class="browser-main">
-                        <div class="browser-content" id="browser-content">
-                            <div class="loading-spinner">Loading directories...</div>
-                        </div>
-                        <div class="file-preview" id="file-preview" style="display: none;">
-                            <div class="preview-header">
-                                <h4 id="preview-filename">File Preview</h4>
-                                <button class="btn btn-small" onclick="closeFilePreview()">✕</button>
-                            </div>
-                            <div class="preview-content" id="preview-content">
-                                <div class="loading-spinner">Loading file...</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="browser-footer">
-                        <div class="selected-path">
-                            <strong>Selected:</strong> <span id="selected-path">None</span>
-                        </div>
-                        <div class="browser-actions">
-                            <button class="btn btn-primary" onclick="selectCurrentFolder()" id="select-btn" disabled>Select This Folder</button>
-                            <button class="btn btn-secondary" onclick="closeFolderBrowser()">Cancel</button>
-                        </div>
-                    </div>
-                </div>
+              </div>
+              <div class="config-item">
+                <label for="azure-endpoint">Azure Endpoint:</label>
+                <input
+                  type="text"
+                  id="azure-endpoint"
+                  placeholder="https://your-resource.openai.azure.com/"
+                />
+              </div>
+              <div class="config-item">
+                <label for="azure-deployment">Azure Deployment Name:</label>
+                <input
+                  type="text"
+                  id="azure-deployment"
+                  placeholder="your-deployment-name"
+                />
+              </div>
             </div>
+
+            <div class="modal-actions">
+              <button
+                class="btn btn-primary"
+                onclick="saveApiConfigWithValidation()"
+              >
+                Save Configuration
+              </button>
+              <button class="btn btn-secondary" onclick="testConnection()">
+                Test Connection
+              </button>
+              <button class="btn btn-danger" onclick="clearApiConfig()">
+                Clear All Keys
+              </button>
+            </div>
+
+            <div
+              id="config-message"
+              class="config-message"
+              style="display: none"
+            ></div>
+          </div>
         </div>
+      </div>
+
+      <!-- Folder Browser Modal -->
+      <div id="folder-browser-modal" class="modal" style="display: none">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>📁 Select Code Folder</h2>
+            <button class="close-btn" onclick="closeFolderBrowser()">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="browser-header">
+              <div class="path-navigation">
+                <button
+                  class="btn btn-small"
+                  onclick="navigateToParent()"
+                  id="parent-btn"
+                >
+                  📁 Up
+                </button>
+                <button class="btn btn-small" onclick="navigateToHome()">
+                  🏠 Home
+                </button>
+                <span class="current-path" id="current-path">/</span>
+              </div>
+            </div>
+
+            <div class="browser-main">
+              <div class="browser-content" id="browser-content">
+                <div class="loading-spinner">Loading directories...</div>
+              </div>
+              <div class="file-preview" id="file-preview" style="display: none">
+                <div class="preview-header">
+                  <h4 id="preview-filename">File Preview</h4>
+                  <button class="btn btn-small" onclick="closeFilePreview()">
+                    ✕
+                  </button>
+                </div>
+                <div class="preview-content" id="preview-content">
+                  <div class="loading-spinner">Loading file...</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="browser-footer">
+              <div class="selected-path">
+                <strong>Selected:</strong> <span id="selected-path">None</span>
+              </div>
+              <div class="browser-actions">
+                <button
+                  class="btn btn-primary"
+                  onclick="selectCurrentFolder()"
+                  id="select-btn"
+                  disabled
+                >
+                  Select This Folder
+                </button>
+                <button
+                  class="btn btn-secondary"
+                  onclick="closeFolderBrowser()"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
+  </body>
 </html>

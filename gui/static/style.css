@@ -995,6 +995,16 @@ textarea {
     min-width: fit-content;
 }
 
+.button-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.button-group .btn-small {
+    padding: 10px 15px;
+}
+
 .browser-header {
     margin-bottom: 20px;
     padding-bottom: 15px;
@@ -1120,6 +1130,12 @@ textarea {
     background: #f8fafc;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transform: translateX(2px);
+}
+
+.browser-item.selected {
+    background: rgba(59, 130, 246, 0.15);
+    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3);
+    border-left: 3px solid var(--primary-color);
 }
 
 .browser-item.directory {

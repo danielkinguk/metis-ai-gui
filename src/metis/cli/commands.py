@@ -65,7 +65,10 @@ def run_file_review(engine, file_path, args):
     if not check_file_exists(file_path):
         return
     raw_result = with_spinner(
-        f"Reviewing file {file_path}...", engine.review_file, file_path=file_path
+        f"Reviewing file {file_path}...",
+        engine.review_file,
+        file_path=file_path,
+        include_related_context=False,
     )
 
     if raw_result and isinstance(raw_result.get("reviews"), list):
