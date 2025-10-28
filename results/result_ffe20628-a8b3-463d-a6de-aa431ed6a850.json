@@ -1,0 +1,50 @@
+{
+    "reviews": [
+        {
+            "file": "pw_gen.py",
+            "file_path": "/project/workspace/examples/pw_gen.py",
+            "reviews": [
+                {
+                    "issue": "Use of non-cryptographically secure PRNG (random.choice) for password generation",
+                    "code_snippet": "import random\n...\npassword = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The function generate_password() uses the Python random module (import random) and selects characters via random.choice(all_chars). The random module is not intended for generating cryptographic secrets; it is a PRNG whose outputs can be predictable given sufficient information about the seed/state. Using it to generate passwords can produce weak or guessable passwords and is inappropriate for any security-sensitive secret generation.",
+                    "mitigation": "Use a cryptographically secure random source. In Python prefer the secrets module (e.g., secrets.choice, secrets.token_urlsafe, or secrets.token_bytes) to generate secrets. Replace random.choice(...) with secrets.choice(...) or generate a secure random byte sequence and encode it as needed. Example mitigations: use secrets.choice(all_chars) in the generator, or use secrets.token_urlsafe()/token_bytes() and map/encode to the allowed character set.",
+                    "confidence": 0.95,
+                    "cwe": "CWE-330",
+                    "severity": "High",
+                    "line_number": 14
+                },
+                {
+                    "issue": "Generated password is printed at module level (exposure of secret and side-effect on import)",
+                    "code_snippet": "password = generate_password(10)\nprint(password)",
+                    "reasoning": "The module calls generate_password(10) and prints the result at import/execution time. Printing secrets to stdout can expose them in terminal history, CI/CD logs, system logs, or other logging/monitoring tools. Additionally, performing secret generation and printing as a side-effect at module import time means importing this module from other code will unexpectedly produce and disclose a password.",
+                    "mitigation": "Remove module-level secret generation and printing. If a CLI/test is needed, guard execution with if __name__ == \"__main__\": so secrets are only generated when the module is explicitly executed. Avoid printing passwords; instead return them to the caller or store them securely using appropriate secret management solutions. Ensure any secret output is sent only to secure sinks and not to logs.",
+                    "confidence": 0.9,
+                    "cwe": "CWE-200",
+                    "severity": "Medium",
+                    "line_number": 19
+                },
+                {
+                    "issue": "No input validation on 'length' (potential for empty passwords or resource exhaustion)",
+                    "code_snippet": "def generate_password(length):\n    \"\"\"This function generates a random password\n    of a given length using a combination of\n    uppercase letters, lowercase letters,\n    digits, and special characters\"\"\"\n\n    # Define a string containing all possible characters\n    all_chars = string.ascii_letters + string.digits + string.punctuation\n\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The function accepts length without validating that it is a non-negative integer within reasonable bounds. If length is negative, the generator expression will produce no characters (resulting in an empty password). If length is extremely large, the generator can consume excessive CPU and memory, potentially leading to denial-of-service or out-of-memory conditions. There is also no type checking to ensure callers provide an integer.",
+                    "mitigation": "Validate the length parameter: ensure it's an integer, enforce a minimum (e.g., >= 8 per policy) and a maximum (to prevent excessive resource use), and raise a clear exception on invalid values. For example, check isinstance(length, int) and bounds such as 1 <= length <= MAX_PASSWORD_LENGTH.",
+                    "confidence": 0.8,
+                    "cwe": "CWE-400",
+                    "severity": "Medium",
+                    "line_number": 1
+                },
+                {
+                    "issue": "No guarantee that generated password contains at least one character from each required class (may not meet complexity policies)",
+                    "code_snippet": "all_chars = string.ascii_letters + string.digits + string.punctuation\n\n# Generate a password using a random selection of characters\npassword = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The code selects each character independently from a combined character set. This approach does not guarantee that the result includes at least one uppercase letter, one lowercase letter, one digit, and one special character. Many security policies require passwords to include characters from multiple classes; without enforcement, the generator can produce passwords that fail complexity requirements (e.g., all digits or all lowercase), reducing effective strength.",
+                    "mitigation": "Implement composition guarantees when required by policy: pick at least one character from each required class, then fill the rest randomly (using a CSPRNG), and finally shuffle the resulting characters to avoid predictable placement. Validate the resulting password against the desired policy before returning.",
+                    "confidence": 0.85,
+                    "cwe": "CWE-521",
+                    "severity": "Medium",
+                    "line_number": 11
+                }
+            ]
+        }
+    ]
+}

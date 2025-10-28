@@ -1,0 +1,40 @@
+{
+    "reviews": [
+        {
+            "file": "pw_gen.py",
+            "file_path": "/project/workspace/examples/pw_gen.py",
+            "reviews": [
+                {
+                    "issue": "Use of non-cryptographically secure PRNG for password generation",
+                    "code_snippet": "import random\n...\npassword = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The code uses the random module (Mersenne Twister) to select characters for passwords: random.choice(all_chars). The random module is not suitable for generating cryptographic secrets or passwords because its outputs are predictable if the internal state is known or seeded, and it does not provide cryptographic-strength randomness. Using it to generate passwords can allow attackers to predict or brute-force generated passwords more easily than when using a cryptographically secure generator.",
+                    "mitigation": "Use a cryptographically secure randomness source. In Python, prefer the secrets module for selecting random characters (e.g., secrets.choice()) or use secrets.token_urlsafe()/secrets.token_bytes() and map/encode as needed. Example mitigation: replace random.choice(all_chars) with secrets.choice(all_chars) or construct passwords from secrets.token_urlsafe() with appropriate post-processing. Ensure the entire password-generation pipeline relies on secrets/os.urandom rather than random.",
+                    "confidence": 0.95,
+                    "cwe": "CWE-330",
+                    "severity": "High",
+                    "line_number": 14
+                },
+                {
+                    "issue": "Generated password is printed to stdout (exposes secret)",
+                    "code_snippet": "# Test the function by generating a password of length 10\npassword = generate_password(10)\nprint(password)",
+                    "reasoning": "The script prints the generated password to standard output. Printing sensitive secrets can expose them to logs, terminal history, CI build logs, or other observers. This practice risks accidental disclosure of credentials, especially if this code is run in shared or production environments.",
+                    "mitigation": "Avoid printing or logging generated secrets. If you must persist or transmit the password, do so using secure channels and storage (e.g., encrypted secret stores or key management systems). Remove or guard test/demo print statements before using the code in production. If this file is for testing only, ensure it is not included in production builds or CI logs.",
+                    "confidence": 0.9,
+                    "cwe": "CWE-200",
+                    "severity": "Medium",
+                    "line_number": 17
+                },
+                {
+                    "issue": "No enforcement of character-class inclusion (weak/insufficient password composition guarantees)",
+                    "code_snippet": "# Define a string containing all possible characters\nall_chars = string.ascii_letters + string.digits + string.punctuation\n\n# Generate a password using a random selection of characters\npassword = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The generator performs independent random selections from a pool that includes letters, digits, and punctuation, but does not guarantee that the resulting password contains at least one uppercase, one lowercase, one digit, and one special character. For short lengths, or by chance, the produced password may lack required character classes, producing passwords that do not meet common password policies or have weaker entropy characteristics than expected.",
+                    "mitigation": "Enforce composition requirements explicitly: select at least one character from each required class (uppercase, lowercase, digits, punctuation), then fill the remaining length from the full pool, and finally shuffle the result. Also validate and enforce a sensible minimum length (e.g., 12) appropriate for your threat model. Use a cryptographically secure RNG (secrets) when performing these selections.",
+                    "confidence": 0.85,
+                    "cwe": "CWE-521",
+                    "severity": "Medium",
+                    "line_number": 9
+                }
+            ]
+        }
+    ]
+}

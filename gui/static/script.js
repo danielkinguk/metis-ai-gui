@@ -175,11 +175,9 @@ function showResults(data) {
             if (issues.length > 0) {
                 controlsEl.style.display = 'block';
                 filterResults(); // Initialize stats
-                updateSeverityCounters();
-                if (sevRow) sevRow.style.display = 'grid';
-            } else {
-                if (sevRow) sevRow.style.display = 'none';
             }
+            // Always compute severity counters from results (DOM or raw JSON)
+            updateSeverityCounters();
         } else if (data.stdout) {
             const messageType = data.warning ? 'warning' : 'success';
             resultContent.innerHTML = `<div class="message ${messageType}">

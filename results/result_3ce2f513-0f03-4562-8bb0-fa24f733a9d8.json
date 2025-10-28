@@ -1,0 +1,60 @@
+{
+    "reviews": [
+        {
+            "file": "examples/pw_gen.py",
+            "file_path": "/project/workspace/examples/pw_gen.py",
+            "reviews": [
+                {
+                    "issue": "Use of non-cryptographic RNG (random.choice) for password generation",
+                    "code_snippet": "import random\n...\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The code uses the random module's random.choice to select characters. The random module (Mersenne Twister) is not designed to be cryptographically secure or unpredictable for secret generation. Passwords generated this way can be predictable if the RNG state is discovered or if an attacker can infer the internal state, which undermines the confidentiality of generated secrets and makes them vulnerable to brute-force or state-prediction attacks.",
+                    "mitigation": "Use a cryptographically secure random generator intended for secrets. In Python, use the secrets module (e.g., secrets.choice or secrets.token_urlsafe) or secrets.SystemRandom. Example: use secrets.choice(all_chars) or secrets.token_urlsafe() and then format/trim as needed. Ensure chosen approach provides sufficient entropy for the required password length.",
+                    "confidence": 0.95,
+                    "cwe": "CWE-330",
+                    "severity": "High",
+                    "line_number": 12
+                },
+                {
+                    "issue": "Sensitive information printed to standard output (password leakage)",
+                    "code_snippet": "# Test the function by generating a password of length 10\npassword = generate_password(10)\nprint(password)",
+                    "reasoning": "The script generates a password and immediately prints it to stdout. Printing secrets to console risks accidental exposure via terminal history, logs, monitoring systems, CI job logs, or other users on a shared system. Test/demo code that emits secrets can result in persistent leakage of credentials.",
+                    "mitigation": "Remove automatic test generation and printing from production code. If demonstrating locally, ensure output is handled securely (e.g., display only interactively to the intended user, avoid logging, or write to a secure credential store). Consider returning the password from functions without side effects and let callers decide secure handling. For automated environments, avoid emitting secrets to logs altogether.",
+                    "confidence": 0.9,
+                    "cwe": "CWE-200",
+                    "severity": "Medium",
+                    "line_number": 17
+                },
+                {
+                    "issue": "No enforcement of required character classes (may produce weak passwords lacking digits/specials)",
+                    "code_snippet": "    # Define a string containing all possible characters\n    all_chars = string.ascii_letters + string.digits + string.punctuation\n\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "Although the character pool includes letters, digits, and punctuation, the selection is purely random and does not guarantee the resulting password contains at least one character from each required class (uppercase, lowercase, digit, special). A randomly produced password can therefore fail to meet password policy requirements or have reduced effective complexity (e.g., all letters), increasing the risk of compromise.",
+                    "mitigation": "Enforce composition rules explicitly: require and guarantee inclusion of at least one character from each required category by selecting one character from each class first, then filling the remainder randomly, and finally shuffling. Also define and enforce a secure minimum length (e.g., >= 12 or per policy).",
+                    "confidence": 0.8,
+                    "cwe": "CWE-521",
+                    "severity": "Medium",
+                    "line_number": 9
+                },
+                {
+                    "issue": "No input validation on length; potential for resource exhaustion or unintended results",
+                    "code_snippet": "def generate_password(length):\n...\n    password = \"\".join(random.choice(all_chars) for i in range(length))\n\n    return password",
+                    "reasoning": "The function accepts length without type or bounds checking. If called with an extremely large integer, it can cause high memory and CPU consumption (Denial of Service). If called with non-integer types, it may raise exceptions. Negative lengths produce an empty password (range(length) with negative length yields empty iteration), which may result in generation of an unusable secret.",
+                    "mitigation": "Validate the length parameter: ensure it is an integer within a safe, policy-defined range (e.g., min_length >= 8 or 12; max_length to prevent DoS). Raise clear errors on invalid input. Also consider explicit behavior for edge cases (e.g., do not accept zero or negative lengths).",
+                    "confidence": 0.7,
+                    "cwe": "CWE-400",
+                    "severity": "Medium",
+                    "line_number": 12
+                },
+                {
+                    "issue": "Use of string.punctuation may include characters unsafe or unsupported in target systems",
+                    "code_snippet": "all_chars = string.ascii_letters + string.digits + string.punctuation",
+                    "reasoning": "string.punctuation includes a variety of special characters, some of which may be problematic in different contexts (e.g., systems that disallow certain punctuation, shell metacharacters, characters that need escaping, or systems with encoding limitations). Generating passwords with such characters without context-aware filtering may cause failures or cause developers to employ insecure workarounds (like stripping/transforming the password).",
+                    "mitigation": "Tailor the allowed character set to the target environment or provide configurable character sets. Document or validate the character set against the target systems' accepted character classes. If certain punctuation is unsafe for the intended use, exclude those characters explicitly.",
+                    "confidence": 0.6,
+                    "cwe": "CWE-Unknown",
+                    "severity": "Low",
+                    "line_number": 11
+                }
+            ]
+        }
+    ]
+}

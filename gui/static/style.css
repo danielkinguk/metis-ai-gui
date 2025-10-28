@@ -408,14 +408,31 @@ textarea {
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow);
     font-weight: 600;
+    position: relative;
+    overflow: hidden;
 }
 
 .severity-chip .label { color: var(--text-primary); }
 .severity-chip .count { font-variant-numeric: tabular-nums; }
 
-.severity-chip.high { border-left: 4px solid var(--error-color); }
-.severity-chip.medium { border-left: 4px solid var(--warning-color); }
-.severity-chip.low { border-left: 4px solid var(--success-color); }
+/* Decorative color bars on both sides */
+.severity-chip::before,
+.severity-chip::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+}
+.severity-chip::before { left: 0; }
+.severity-chip::after { right: 0; }
+
+.severity-chip.high::before,
+.severity-chip.high::after { background: var(--error-color); }
+.severity-chip.medium::before,
+.severity-chip.medium::after { background: var(--warning-color); }
+.severity-chip.low::before,
+.severity-chip.low::after { background: var(--success-color); }
 
 [data-theme="dark"] .severity-chip {
     background: var(--bg-secondary);

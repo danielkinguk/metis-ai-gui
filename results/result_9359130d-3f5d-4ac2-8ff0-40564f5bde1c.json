@@ -1,0 +1,51 @@
+{
+    "reviews": [
+        {
+            "file": "pw_gen.py",
+            "file_path": "/project/workspace/examples/pw_gen.py",
+            "reviews": [
+                {
+                    "issue": "Use of non-cryptographic PRNG (predictable randomness) to generate passwords",
+                    "code_snippet": "import random\n\n...\n\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The code imports the standard library random module and uses random.choice(...) to build the password. The random module (Mersenne Twister) is not a cryptographically secure PRNG and is predictable if an attacker can infer or guess the seed/state. Using it to generate secrets such as passwords can allow attackers to reproduce or guess generated passwords.",
+                    "mitigation": "Use a cryptographically secure randomness source. In Python, prefer the secrets module (e.g., secrets.choice, secrets.token_urlsafe, or secrets.token_bytes) or os.urandom. Example: use secrets.choice(all_chars) for each character or use secrets.token_urlsafe and transform/adjust to required character classes/length.",
+                    "confidence": 0.95,
+                    "cwe": "CWE-330",
+                    "severity": "High",
+                    "line_number": 12
+                },
+                {
+                    "issue": "Sensitive information (generated password) is printed to stdout",
+                    "code_snippet": "password = generate_password(10)\nprint(password)",
+                    "reasoning": "The bottom of the file assigns the generated password to the local variable 'password' and prints it. Printing secrets to stdout can expose them in logs, console history, CI/CD job logs, terminal scrollback, or other monitoring tools, leading to information disclosure.",
+                    "mitigation": "Avoid printing secrets. Return generated passwords to callers and let the caller decide how to handle them securely. If you must display a secret for one-time use, show it in a secure, ephemeral UI or copy-to-clipboard mechanism and avoid logging. Ensure any automated test code does not print secrets to shared logs.",
+                    "confidence": 0.95,
+                    "cwe": "CWE-200",
+                    "severity": "Medium",
+                    "line_number": 19
+                },
+                {
+                    "issue": "No enforced character-class requirements \u2014 generated password may lack required complexity (contradiction with docstring)",
+                    "code_snippet": "def generate_password(length):\n    \"\"\"This function generates a random password\n    of a given length using a combination of\n    uppercase letters, lowercase letters,\n    digits, and special characters\"\"\"\n\n    # Define a string containing all possible characters\n    all_chars = string.ascii_letters + string.digits + string.punctuation\n\n    # Generate a password using a random selection of characters\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The docstring states the function generates a password using a combination of uppercase, lowercase, digits, and special characters, but the implementation merely samples characters uniformly from the union of those sets. That sampling can by chance produce a password that lacks one or more character classes (e.g., no digits or no uppercase). This may not meet password policy requirements and contradicts the docstring claim.",
+                    "mitigation": "Explicitly enforce class inclusion if policy requires it: ensure the password contains at least one character from each required class (uppercase, lowercase, digit, punctuation) by selecting one from each class first and then filling the remainder randomly, then shuffle. Document behavior clearly. Also use a secure RNG (secrets) when implementing the fix.",
+                    "confidence": 0.9,
+                    "cwe": "CWE-521",
+                    "severity": "Medium",
+                    "explanation": "The docstring claims the function creates a password \"using a combination of uppercase letters, lowercase letters, digits, and special characters\" but the implementation does not guarantee presence of each class; it samples only from the combined pool, which can produce passwords lacking some classes.",
+                    "line_number": 1
+                },
+                {
+                    "issue": "No input validation on length parameter (possible resource exhaustion or unexpected output)",
+                    "code_snippet": "def generate_password(length):\n    ...\n    password = \"\".join(random.choice(all_chars) for i in range(length))",
+                    "reasoning": "The function accepts a length parameter without validation. A caller could pass 0, a negative number, or an extremely large integer. range(length) with 0 yields an empty password (likely undesired). A very large length could cause high memory allocation and CPU use, leading to denial-of-service or application instability.",
+                    "mitigation": "Validate input bounds: enforce a minimum (e.g., >= 8) and a reasonable maximum (e.g., <= 1024 or an application-specific cap). Raise a ValueError on invalid inputs. Also document expected bounds. Consider refusal or rate-limiting of repeated generation requests to mitigate abuse.",
+                    "confidence": 0.8,
+                    "cwe": "CWE-400",
+                    "severity": "Medium",
+                    "line_number": 1
+                }
+            ]
+        }
+    ]
+}
