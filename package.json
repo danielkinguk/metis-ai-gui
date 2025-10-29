@@ -1,0 +1,7 @@
+{
+  "name": "metis-ai-gui",
+  "private": true,
+  "scripts": {
+    "start": "bash .codesandbox/start.sh"
+  }
+}

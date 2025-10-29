@@ -1,0 +1,50 @@
+{
+    "reviews": [
+        {
+            "file": "sqlmap.py",
+            "file_path": "/project/workspace/examples/sqlmap.py",
+            "reviews": [
+                {
+                    "issue": "Sensitive HTTP data written to a file (HAR) without redaction or encryption",
+                    "code_snippet": "        if conf.get(\"harFile\"):\n            try:\n                with openFile(conf.harFile, \"w+b\") as f:\n                    json.dump(conf.httpCollector.obtain(), fp=f, indent=4, separators=(',', ': '))\n            except SqlmapBaseException as ex:\n                errMsg = getSafeExString(ex)\n                logger.critical(errMsg)",
+                    "reasoning": "The code unconditionally writes the result of conf.httpCollector.obtain() into a file specified by conf.harFile. An HTTP collector typically includes full HTTP requests and responses (URLs, headers, cookies, authorization tokens, bodies), which can contain sensitive data (credentials, session tokens, personally identifiable information). The dump operation does not perform any redaction, access control, or encryption before writing to disk, so sensitive information may be persisted on disk in cleartext and exposed to local users or backups.",
+                    "mitigation": "Before writing HAR data to disk, explicitly redact or remove sensitive fields (e.g., Authorization headers, cookies, POST bodies with credentials). Enforce safe file permissions (e.g., owner-only read/write), validate and limit the path where HAR files may be written (avoid writing to arbitrary locations), and consider encrypting the file at rest or requiring an explicit opt-in flag to persist full request/response data. Log an explicit warning to the user when writing potentially sensitive data.",
+                    "confidence": 0.9,
+                    "cwe": "CWE-200",
+                    "severity": "High",
+                    "line_number": 587
+                },
+                {
+                    "issue": "Arbitrary filesystem deletion of configured temp directories without path validation",
+                    "code_snippet": "        for tempDir in conf.get(\"tempDirs\", []):\n            for prefix in (MKSTEMP_PREFIX.IPC, MKSTEMP_PREFIX.TESTING, MKSTEMP_PREFIX.COOKIE_JAR, MKSTEMP_PREFIX.BIG_ARRAY):\n                for filepath in glob.glob(os.path.join(tempDir, \"%s*\" % prefix)):\n                    try:\n                        os.remove(filepath)\n                    except OSError:\n                        pass\n\n            if any((conf.vulnTest, conf.smokeTest)) or not filterNone(filepath for filepath in glob.glob(os.path.join(tempDir, '*')) if not any(filepath.endswith(_) for _ in (\".lock\", \".exe\", \".so\", '_'))):  # ignore junk files\n                try:\n                    shutil.rmtree(tempDir, ignore_errors=True)\n                except OSError:\n                    pass",
+                    "reasoning": "The cleanup logic iterates over paths returned by conf.get('tempDirs', []) and removes files and may recursively remove the entire tempDir via shutil.rmtree(tempDir, ...). If conf.tempDirs can be influenced by a user, configuration file, or external input, this behavior can result in removal of arbitrary directories and files outside of the intended application scope. There is no validation that tempDir is inside an expected base directory, nor any safety checks preventing accidental or malicious deletion of important system or user data.",
+                    "mitigation": "Validate and canonicalize each tempDir before performing removal (resolve realpath and ensure it is a subdirectory of an allowed base temp directory). Limit deletions to known safe prefixes and only remove files created by the application (e.g., track created files and remove those specifically). Avoid blind calls to shutil.rmtree on configurable paths. Consider adding a dry-run or explicit confirmation step for destructive cleanup, and ensure file operations run with least privilege.",
+                    "confidence": 0.7,
+                    "cwe": "CWE-73",
+                    "severity": "High",
+                    "line_number": 566
+                },
+                {
+                    "issue": "Unconditional import at module import time that may cause side effects on import",
+                    "code_snippet": "else:\n    # cancelling postponed imports (because of CI/CD checks)\n    __import__(\"lib.controller.controller\")",
+                    "reasoning": "When this module is imported (i.e., not executed as __main__), it performs an unconditional import of lib.controller.controller. Importing a module can execute arbitrary initialization code (start threads, open network sockets, access filesystem, etc.). This means merely importing sqlmap.py as a library could trigger substantial side effects in the hosting application or CI/CD environment. Import-time side effects can be unexpected and may cause privilege, resource, or security issues in environments that import this module for analysis or tooling.",
+                    "mitigation": "Avoid performing potentially side-effecting imports at module import time. Defer imports to functions that explicitly request the behavior (lazy import), or guard side-effecting imports behind an explicit API call or configuration flag. Document the import-time behavior clearly. If the import is only needed for CI/CD checks, consider providing a no-op stub or a separate entry-point that CI/CD can call instead of importing the main module.",
+                    "confidence": 0.6,
+                    "cwe": "CWE-Unknown",
+                    "severity": "Medium",
+                    "line_number": 629
+                },
+                {
+                    "issue": "Global reassignment of sys.stdout/sys.stderr to IPC-backed writers without validation",
+                    "code_snippet": "            from lib.utils.api import StdDbOut\n            from lib.utils.api import setRestAPILog\n\n            # Overwrite system standard output and standard error to write\n            # to an IPC database\n            sys.stdout = StdDbOut(conf.taskid, messagetype=\"stdout\")\n            sys.stderr = StdDbOut(conf.taskid, messagetype=\"stderr\")\n\n            setRestAPILog()",
+                    "reasoning": "The code replaces the global sys.stdout and sys.stderr with StdDbOut instances that write to an IPC database when conf.get('api') is true. This redirection captures all output from the process (including third-party libraries) and sends it to an IPC backend keyed by conf.taskid. If conf.taskid or the IPC mechanism can be influenced by an attacker, sensitive output (including secrets printed to stdout/stderr) could be exfiltrated to or overwritten in the IPC database. Reassigning these globals also changes the behavior expected by other libraries relying on standard file-like objects.",
+                    "mitigation": "Validate and sanitize conf.taskid and ensure the StdDbOut implementation enforces access control and sanitization of data before writing. Rather than replacing sys.stdout/sys.stderr globally, consider writing only designated messages to the IPC database, or provide a logger adapter that can be injected into specific components. Document the behavior and require explicit opt-in for API mode.",
+                    "confidence": 0.6,
+                    "cwe": "CWE-Unknown",
+                    "severity": "Medium",
+                    "line_number": 161
+                }
+            ]
+        }
+    ]
+}

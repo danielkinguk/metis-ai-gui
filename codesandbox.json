@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "start": {
+      "name": "Metis GUI",
+      "command": "bash .codesandbox/start.sh",
+      "preview": { "port": 5000, "open": true }
+    }
+  }
+}
